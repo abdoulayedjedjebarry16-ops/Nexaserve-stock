@@ -207,49 +207,48 @@ const Err = ({msg,onRetry}) => (
 // PAGE DE CONNEXION
 // ═══════════════════════════════════════════════════════════════════
 function LoginPage({onLogin}) {
-  const [code,setCode]   = useState("");
-  const [pass,setPass]   = useState("");
-  const [showP,setShowP] = useState(false);
-  const [error,setError] = useState("");
+  const [code,setCode]     = useState("");
+  const [login,setLogin]   = useState("");
+  const [pass,setPass]     = useState("");
+  const [showP,setShowP]   = useState(false);
+  const [error,setError]   = useState("");
   const [loading,setLoading] = useState(false);
 
   const submit = async () => {
-    if(!code||!pass){setError("Veuillez remplir tous les champs.");return;}
+    if(!code||!login||!pass){ setError("Veuillez remplir tous les champs."); return; }
     setLoading(true); setError("");
     try {
-      const rows = await sb.get("restaurants", `code=eq.${encodeURIComponent(code.toUpperCase())}&select=id,code,nom,plan,statut_abo,date_expiration`);
-      if(!rows||rows.length===0){ setError("Code restaurant introuvable."); setLoading(false); return; }
-      const resto = rows[0];
-      // Vérification du mot de passe via RPC ou comparaison directe
-      // On récupère aussi le password_hash stocké dans un champ séparé
-      const authRows = await sb.get("restaurants", `code=eq.${encodeURIComponent(code.toUpperCase())}&select=id,code,nom,plan,statut_abo,date_expiration,secret_answer`);
-      const r = authRows[0];
-      // Le password est stocké dans secret_answer pour la démo (ou on vérifie via un champ dédié)
-      // Tentative sur secret_answer d'abord, puis on essaie password_hash via une route RPC
-      // Pour la connexion, on suppose que le mot de passe est dans le champ secret_answer ou via un endpoint
-      // Pattern flexible : on tente de récupérer le champ password via une fonction RPC
-      let authenticated = false;
-      try {
-        const rpcRes = await fetch(`${SB_URL}/rest/v1/rpc/verify_restaurant_password`, {
-          method:"POST",
-          headers: sb.headers,
-          body: JSON.stringify({ p_code: code.toUpperCase(), p_password: pass })
-        });
-        if(rpcRes.ok) {
-          const result = await rpcRes.json();
-          authenticated = result === true || result?.verified === true;
-        }
-      } catch(e) {}
+      // 1. Vérifier que le restaurant existe
+      const restos = await sb.get("restaurants", `code=eq.${encodeURIComponent(code.toUpperCase())}&select=id,code,nom,plan,statut_abo,date_expiration`);
+      if(!restos||restos.length===0){ setError("Code restaurant introuvable."); setLoading(false); return; }
+      const resto = restos[0];
 
-      // Fallback : comparaison directe si pas de RPC (pour les restaurants avec secret_answer=password en clair)
-      if(!authenticated) {
-        const pwRows = await sb.get("restaurants", `code=eq.${encodeURIComponent(code.toUpperCase())}&select=secret_answer`);
-        if(pwRows[0]?.secret_answer === pass) authenticated = true;
-      }
+      // 2. Chercher l'employé admin dans ce restaurant avec ce login
+      const empRows = await sb.get("employees",
+        `restaurant_id=eq.${encodeURIComponent(resto.id)}&login=eq.${encodeURIComponent(login.toLowerCase().trim())}&select=id,prenom,nom,login,password_hash,is_admin,is_super_admin,actif,role`
+      );
+      if(!empRows||empRows.length===0){ setError("Identifiant introuvable pour ce restaurant."); setLoading(false); return; }
+      const emp = empRows[0];
 
-      if(!authenticated){ setError("Mot de passe incorrect."); setLoading(false); return; }
+      // 3. Vérifier que c'est un admin
+      if(!emp.is_admin && !emp.is_super_admin){ setError("Accès refusé. Seuls les administrateurs peuvent se connecter."); setLoading(false); return; }
 
-      const session = { id:r.id, code:r.code, restaurant:r.nom, plan:r.plan||"essai", statut:r.statut_abo, expiration:r.date_expiration };
+      // 4. Vérifier que le compte est actif
+      if(!emp.actif){ setError("Ce compte est désactivé."); setLoading(false); return; }
+
+      // 5. Vérifier le mot de passe (comparaison directe du hash ou valeur en clair)
+      const pwMatch = emp.password_hash === pass;
+      if(!pwMatch){ setError("Mot de passe incorrect."); setLoading(false); return; }
+
+      const session = {
+        id: resto.id,
+        code: resto.code,
+        restaurant: resto.nom,
+        plan: resto.plan || "essai",
+        statut: resto.statut_abo,
+        expiration: resto.date_expiration,
+        admin: { id:emp.id, prenom:emp.prenom, nom:emp.nom, role:emp.role, is_super_admin:emp.is_super_admin }
+      };
       localStorage.setItem("nxs_session", JSON.stringify(session));
       onLogin(session);
     } catch(e) {
@@ -258,47 +257,87 @@ function LoginPage({onLogin}) {
     setLoading(false);
   };
 
+  const inpStyle = {
+    width:"100%", background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.1)",
+    borderRadius:14, padding:"16px 16px", color:"#fff", fontSize:15, outline:"none",
+    boxSizing:"border-box", fontFamily:"system-ui,sans-serif"
+  };
+
   return (
-    <div style={{minHeight:"100vh",background:"#0d0d1a",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 20px",fontFamily:"system-ui,sans-serif"}}>
-      <div style={{textAlign:"center",marginBottom:36}}>
-        <div style={{width:70,height:70,borderRadius:20,background:"linear-gradient(135deg,#F97316,#ea580c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,margin:"0 auto 14px",boxShadow:"0 8px 30px rgba(249,115,22,.4)"}}>🍽️</div>
-        <div style={{fontSize:26,fontWeight:800,color:"#fff",letterSpacing:"-0.5px"}}>NexaServe</div>
-        <div style={{fontSize:13,color:"#555",marginTop:4}}>Gestion de restaurant intelligente</div>
+    <div style={{minHeight:"100vh",background:"#111318",display:"flex",flexDirection:"column",fontFamily:"system-ui,sans-serif"}}>
+
+      {/* Header brand */}
+      <div style={{paddingTop:60,paddingBottom:24,textAlign:"center"}}>
+        <div style={{fontSize:34,fontWeight:900,color:"#F97316",letterSpacing:"-1px"}}>NexaServe</div>
+        <div style={{fontSize:12,color:"#555",marginTop:6,letterSpacing:"0.18em",textTransform:"uppercase",fontWeight:500}}>Gestion de restaurant</div>
       </div>
 
-      <div style={{width:"100%",maxWidth:380,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:20,padding:"26px 22px"}}>
-        <div style={{fontSize:18,fontWeight:700,color:"#fff",marginBottom:5}}>Connexion</div>
-        <div style={{fontSize:13,color:"#555",marginBottom:22}}>Accédez à votre espace de gestion</div>
+      {/* Tab bar */}
+      <div style={{display:"flex",margin:"0 24px 28px",background:"rgba(255,255,255,.06)",borderRadius:14,padding:4}}>
+        <div style={{flex:1,padding:"11px 0",borderRadius:11,background:"rgba(255,255,255,.1)",textAlign:"center",fontSize:15,fontWeight:700,color:"#fff"}}>Connexion</div>
+        <div style={{flex:1,padding:"11px 0",textAlign:"center",fontSize:15,fontWeight:500,color:"#555"}}>Inscription</div>
+      </div>
 
-        <Field label="Code restaurant">
-          <Inp value={code} onChange={e=>{setCode(e.target.value.toUpperCase());setError("");}}
-            onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Ex: NXS-XXXX"
-            style={{...ci,letterSpacing:"0.1em",fontWeight:600}}/>
-        </Field>
+      {/* Card */}
+      <div style={{margin:"0 20px",background:"#1a1d24",borderRadius:20,padding:"28px 22px",flex:1,maxHeight:480}}>
+        <div style={{fontSize:22,fontWeight:800,color:"#fff",marginBottom:6}}>Connexion</div>
+        <div style={{fontSize:14,color:"#666",marginBottom:26,lineHeight:1.5}}>Saisissez votre code restaurant et vos identifiants</div>
 
-        <Field label="Mot de passe">
+        {/* Code restaurant */}
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:12,color:"#888",marginBottom:8,fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase"}}>Code restaurant</div>
+          <input value={code} onChange={e=>{setCode(e.target.value.toUpperCase());setError("");}}
+            onKeyDown={e=>e.key==="Enter"&&submit()}
+            placeholder="NXS-XXXX"
+            style={{...inpStyle,letterSpacing:"0.1em",fontWeight:600}}/>
+        </div>
+
+        {/* Login */}
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:12,color:"#888",marginBottom:8,fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase"}}>Email ou identifiant</div>
+          <input value={login} onChange={e=>{setLogin(e.target.value);setError("");}}
+            onKeyDown={e=>e.key==="Enter"&&submit()}
+            placeholder="prenom.nom ou email"
+            autoCapitalize="none" autoCorrect="off"
+            style={inpStyle}/>
+        </div>
+
+        {/* Password */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:12,color:"#888",marginBottom:8,fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase"}}>Mot de passe</div>
           <div style={{position:"relative"}}>
             <input type={showP?"text":"password"} value={pass}
               onChange={e=>{setPass(e.target.value);setError("");}}
               onKeyDown={e=>e.key==="Enter"&&submit()}
-              placeholder="••••••••" style={{...ci,paddingRight:44}}/>
-            <button onClick={()=>setShowP(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#555",fontSize:16,padding:4}}>
+              placeholder="••••••••"
+              style={{...inpStyle,paddingRight:50}}/>
+            <button onClick={()=>setShowP(s=>!s)} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#888",fontSize:18,padding:0,lineHeight:1}}>
               {showP?"🙈":"👁"}
             </button>
           </div>
-        </Field>
+        </div>
 
+        {/* Error */}
         {error&&(
-          <div style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",borderRadius:10,padding:"10px 14px",marginBottom:16,color:"#ef4444",fontSize:13,fontWeight:500}}>
+          <div style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",borderRadius:12,padding:"11px 14px",marginBottom:16,color:"#ef4444",fontSize:13,fontWeight:500}}>
             ⚠️ {error}
           </div>
         )}
 
-        <button onClick={submit} disabled={loading} style={{width:"100%",background:"linear-gradient(135deg,#F97316,#ea580c)",border:"none",borderRadius:12,padding:"14px",color:"#fff",fontWeight:700,fontSize:15,cursor:loading?"not-allowed":"pointer",opacity:loading?.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 20px rgba(249,115,22,.35)"}}>
-          {loading?"⏳ Connexion...":"🔑 Se connecter"}
+        {/* Submit */}
+        <button onClick={submit} disabled={loading} style={{width:"100%",background:"#F97316",border:"none",borderRadius:14,padding:"16px",color:"#000",fontWeight:800,fontSize:16,cursor:loading?"not-allowed":"pointer",opacity:loading?.7:1,marginBottom:16}}>
+          {loading?"Connexion en cours...":"Se connecter"}
         </button>
+
+        {/* Links */}
+        <div style={{textAlign:"center",fontSize:13,color:"#F97316",display:"flex",justifyContent:"center",gap:12}}>
+          <span style={{cursor:"pointer"}}>Mot de passe oublié ?</span>
+          <span style={{color:"#444"}}>·</span>
+          <span style={{cursor:"pointer"}}>Code oublié ?</span>
+        </div>
       </div>
-      <div style={{marginTop:20,fontSize:11,color:"#333"}}>© 2026 NexaServe · Tous droits réservés</div>
+
+      <div style={{textAlign:"center",padding:"20px 0",fontSize:11,color:"#333"}}>© 2026 NexaServe</div>
     </div>
   );
 }
