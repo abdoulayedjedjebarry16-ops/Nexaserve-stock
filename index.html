@@ -228,8 +228,9 @@ const NXS_CSS = `
   .nxs-label { display:block; font-size:11px; font-weight:600; color:var(--t3); margin-bottom:7px; text-transform:uppercase; letter-spacing:.6px; }
   .nxs-inp-wrap { position:relative; }
   .nxs-inp { width:100%; background:var(--s2); border:1px solid var(--border2); border-radius:10px;
-    padding:12px 14px; color:var(--t1); font-size:14px; outline:none; box-sizing:border-box;
-    font-family:'Plus Jakarta Sans',system-ui,sans-serif; -webkit-appearance:none; transition:border-color .2s; }
+    padding:12px 14px; color:var(--t1); font-size:16px; outline:none; box-sizing:border-box;
+    font-family:'Plus Jakarta Sans',system-ui,sans-serif; -webkit-appearance:none; transition:border-color .2s;
+    -webkit-user-select:text; user-select:text; touch-action:manipulation; }
   .nxs-inp:focus { border-color:var(--gold); }
   .nxs-inp::placeholder { color:var(--t3); }
   .nxs-inp-pr { padding-right:44px; }
@@ -429,7 +430,7 @@ function LoginPage({onLogin}) {
         {/* Logo */}
         <div className="nxs-logo">
           <h1>NexaServe</h1>
-          <p>Gestion de restaurant</p>
+          <p>Gestion du stock</p>
         </div>
 
         {/* ── CONNEXION ── */}
@@ -555,7 +556,7 @@ function LoginPage({onLogin}) {
           </div>
         )}
 
-        <div className="nxs-footer">© 2026 NexaServe · Gestion de restaurant</div>
+        <div className="nxs-footer">© 2026 NexaServe · Gestion du stock</div>
       </div>
     </>
   );
