@@ -204,141 +204,360 @@ const Err = ({msg,onRetry}) => (
 );
 
 // ═══════════════════════════════════════════════════════════════════
-// PAGE DE CONNEXION
+// PAGE DE CONNEXION — design identique à nexaserveapp.com
 // ═══════════════════════════════════════════════════════════════════
-function LoginPage({onLogin}) {
-  const [code,setCode]     = useState("");
-  const [login,setLogin]   = useState("");
-  const [pass,setPass]     = useState("");
-  const [showP,setShowP]   = useState(false);
-  const [error,setError]   = useState("");
-  const [loading,setLoading] = useState(false);
 
-  const submit = async () => {
-    if(!code||!login||!pass){ setError("Veuillez remplir tous les champs."); return; }
-    setLoading(true); setError("");
+// Variables CSS identiques à l'app principale
+const NXS_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+  .nxs-auth { --bg:#080A0F; --s1:#0F1118; --s2:#171A24; --s3:#1E2230;
+    --gold:#F5A623; --gold2:#D4891A; --goldf:rgba(245,166,35,0.12);
+    --green:#22C55E; --red:#EF4444; --t1:#F0F2F8; --t2:#9CA3B0; --t3:#5A6170;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
+    min-height:100vh; background:var(--bg); color:var(--t1);
+    font-family:'Plus Jakarta Sans',system-ui,sans-serif;
+    display:flex; flex-direction:column; overflow-y:auto; }
+  .nxs-auth h1,h2 { font-family:'Outfit',sans-serif; }
+  .nxs-logo { text-align:center; padding:52px 0 28px; }
+  .nxs-logo h1 { font-size:30px; font-weight:900; color:var(--gold); letter-spacing:-0.5px; margin:0; }
+  .nxs-logo p { font-size:11px; color:var(--t3); margin:5px 0 0; letter-spacing:2.5px; text-transform:uppercase; }
+  .nxs-card { background:var(--s1); border:1px solid var(--border); border-radius:20px; padding:24px; margin:0 20px; }
+  .nxs-card-title { font-size:20px; font-weight:700; margin:0 0 5px; font-family:'Outfit',sans-serif; }
+  .nxs-card-sub { font-size:13px; color:var(--t3); margin:0 0 22px; line-height:1.5; }
+  .nxs-field { margin-bottom:15px; }
+  .nxs-label { display:block; font-size:11px; font-weight:600; color:var(--t3); margin-bottom:7px; text-transform:uppercase; letter-spacing:.6px; }
+  .nxs-inp-wrap { position:relative; }
+  .nxs-inp { width:100%; background:var(--s2); border:1px solid var(--border2); border-radius:10px;
+    padding:12px 14px; color:var(--t1); font-size:14px; outline:none; box-sizing:border-box;
+    font-family:'Plus Jakarta Sans',system-ui,sans-serif; -webkit-appearance:none; transition:border-color .2s; }
+  .nxs-inp:focus { border-color:var(--gold); }
+  .nxs-inp::placeholder { color:var(--t3); }
+  .nxs-inp-pr { padding-right:44px; }
+  .nxs-inp-eye { position:absolute; right:0; top:0; height:100%; width:42px;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--t3); font-size:16px; background:none; border:none; cursor:pointer; }
+  .nxs-error { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.25);
+    border-radius:10px; padding:11px 14px; margin-bottom:14px;
+    color:#EF4444; font-size:13px; font-weight:500; }
+  .nxs-success { background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.25);
+    border-radius:10px; padding:11px 14px; margin-bottom:14px;
+    color:#22C55E; font-size:13px; font-weight:500; }
+  .nxs-btn { width:100%; background:var(--gold); border:none; border-radius:10px;
+    padding:14px; color:#080A0F; font-weight:800; font-size:15px;
+    cursor:pointer; font-family:'Outfit',sans-serif; transition:background .2s; margin-bottom:14px; }
+  .nxs-btn:disabled { opacity:.6; cursor:not-allowed; }
+  .nxs-btn:not(:disabled):hover { background:var(--gold2); }
+  .nxs-links { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .nxs-link { font-size:13px; color:var(--gold); background:none; border:none; cursor:pointer; padding:0; font-family:inherit; }
+  .nxs-sep { color:var(--t3); font-size:13px; line-height:1; }
+  .nxs-back { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--t3);
+    background:none; border:none; cursor:pointer; margin-bottom:16px; padding:0; font-family:inherit; }
+  .nxs-footer { text-align:center; padding:20px 0 28px; font-size:11px; color:var(--t3); }
+  .nxs-info { background:var(--goldf); border:1px solid rgba(245,166,35,.2);
+    border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:13px; color:var(--t2); line-height:1.5; }
+`;
+
+function LoginPage({onLogin}) {
+  const [step, setStep]       = useState("login");      // login | forgot_pass | forgot_code
+  const [code,  setCode]      = useState("");
+  const [login, setLogin]     = useState("");
+  const [pass,  setPass]      = useState("");
+  const [showP, setShowP]     = useState(false);
+  const [msg,   setMsg]       = useState({type:"",text:""});
+  const [loading,setLoading]  = useState(false);
+
+  // États "mot de passe oublié"
+  const [fpCode,  setFpCode]  = useState("");
+  const [fpLogin, setFpLogin] = useState("");
+  const [fpQ,     setFpQ]     = useState("");          // question secrète affichée
+  const [fpA,     setFpA]     = useState("");          // réponse saisie
+  const [fpNew,   setFpNew]   = useState("");
+  const [fpNew2,  setFpNew2]  = useState("");
+  const [fpEmp,   setFpEmp]   = useState(null);        // employé trouvé
+  const [fpResto, setFpResto] = useState(null);
+  const [fpStep,  setFpStep]  = useState(1);           // 1=identif, 2=question, 3=nouveau mdp
+
+  // États "code oublié"
+  const [fcCode,  setFcCode]  = useState("");
+  const [fcQ,     setFcQ]     = useState("");
+  const [fcA,     setFcA]     = useState("");
+  const [fcResto, setFcResto] = useState(null);
+  const [fcStep,  setFcStep]  = useState(1);           // 1=email, 2=question, 3=afficher code
+
+  const err  = t => setMsg({type:"error",   text:t});
+  const succ = t => setMsg({type:"success", text:t});
+  const clr  = ()=> setMsg({type:"",text:""});
+
+  // ── CONNEXION ──────────────────────────────────────────────────
+  const submitLogin = async () => {
+    if(!code||!login||!pass){ err("Veuillez remplir tous les champs."); return; }
+    setLoading(true); clr();
     try {
-      // 1. Vérifier que le restaurant existe
-      const restos = await sb.get("restaurants", `code=eq.${encodeURIComponent(code.toUpperCase())}&select=id,code,nom,plan,statut_abo,date_expiration`);
-      if(!restos||restos.length===0){ setError("Code restaurant introuvable."); setLoading(false); return; }
+      const restos = await sb.get("restaurants",
+        `code=eq.${encodeURIComponent(code.toUpperCase())}&select=id,code,nom,plan,statut_abo,date_expiration`);
+      if(!restos?.length){ err("Code restaurant introuvable."); setLoading(false); return; }
       const resto = restos[0];
 
-      // 2. Chercher l'employé admin dans ce restaurant avec ce login
+      // Vérif abonnement (même logique que nexaserveapp)
+      const statut = resto.statut_abo || "essai";
+      const dateExp = resto.date_expiration ? new Date(resto.date_expiration) : null;
+      if(statut==="suspendu"){ err("Ce compte est suspendu. Contactez NexaServe au +224 620 764 405."); setLoading(false); return; }
+      if(statut==="expire"){ err("Abonnement expiré. Contactez NexaServe pour renouveler."); setLoading(false); return; }
+      if(dateExp && dateExp < new Date()){
+        err(statut==="essai"
+          ? "Votre période d'essai est terminée. Contactez NexaServe au +224 620 764 405."
+          : "Abonnement expiré. Contactez NexaServe pour renouveler au +224 620 764 405.");
+        setLoading(false); return;
+      }
+
       const empRows = await sb.get("employees",
-        `restaurant_id=eq.${encodeURIComponent(resto.id)}&login=eq.${encodeURIComponent(login.toLowerCase().trim())}&select=id,prenom,nom,login,password_hash,is_admin,is_super_admin,actif,role`
-      );
-      if(!empRows||empRows.length===0){ setError("Identifiant introuvable pour ce restaurant."); setLoading(false); return; }
+        `restaurant_id=eq.${encodeURIComponent(resto.id)}&login=eq.${encodeURIComponent(login.toLowerCase().trim())}&select=id,prenom,nom,login,password_hash,is_admin,is_super_admin,actif,role`);
+      if(!empRows?.length){ err("Identifiant introuvable pour ce restaurant."); setLoading(false); return; }
       const emp = empRows[0];
-
-      // 3. Vérifier que c'est un admin
-      if(!emp.is_admin && !emp.is_super_admin){ setError("Accès refusé. Seuls les administrateurs peuvent se connecter."); setLoading(false); return; }
-
-      // 4. Vérifier que le compte est actif
-      if(!emp.actif){ setError("Ce compte est désactivé."); setLoading(false); return; }
-
-      // 5. Vérifier le mot de passe (comparaison directe du hash ou valeur en clair)
-      const pwMatch = emp.password_hash === pass;
-      if(!pwMatch){ setError("Mot de passe incorrect."); setLoading(false); return; }
+      if(!emp.is_admin && !emp.is_super_admin){ err("Accès refusé. Seuls les administrateurs peuvent accéder au module Stock."); setLoading(false); return; }
+      if(!emp.actif){ err("Ce compte est désactivé."); setLoading(false); return; }
+      if(emp.password_hash !== pass){ err("Mot de passe incorrect."); setLoading(false); return; }
 
       const session = {
-        id: resto.id,
-        code: resto.code,
-        restaurant: resto.nom,
-        plan: resto.plan || "essai",
-        statut: resto.statut_abo,
-        expiration: resto.date_expiration,
-        admin: { id:emp.id, prenom:emp.prenom, nom:emp.nom, role:emp.role, is_super_admin:emp.is_super_admin }
+        id:resto.id, code:resto.code, restaurant:resto.nom,
+        plan:resto.plan||"essai", statut:resto.statut_abo, expiration:resto.date_expiration,
+        admin:{id:emp.id, prenom:emp.prenom, nom:emp.nom, role:emp.role, is_super_admin:emp.is_super_admin}
       };
       localStorage.setItem("nxs_session", JSON.stringify(session));
       onLogin(session);
-    } catch(e) {
-      setError("Erreur de connexion. Vérifiez votre connexion internet.");
-    }
+    } catch(e) { err("Erreur de connexion. Vérifiez votre connexion internet."); }
     setLoading(false);
   };
 
-  const inpStyle = {
-    width:"100%", background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.1)",
-    borderRadius:14, padding:"16px 16px", color:"#fff", fontSize:15, outline:"none",
-    boxSizing:"border-box", fontFamily:"system-ui,sans-serif"
+  // ── MOT DE PASSE OUBLIÉ ────────────────────────────────────────
+  const fpFind = async () => {
+    if(!fpCode||!fpLogin){ err("Code restaurant et identifiant requis."); return; }
+    setLoading(true); clr();
+    try {
+      const restos = await sb.get("restaurants",
+        `code=eq.${encodeURIComponent(fpCode.toUpperCase())}&select=id,nom,secret_question`);
+      if(!restos?.length){ err("Code restaurant introuvable."); setLoading(false); return; }
+      const resto = restos[0];
+      const empRows = await sb.get("employees",
+        `restaurant_id=eq.${encodeURIComponent(resto.id)}&login=eq.${encodeURIComponent(fpLogin.toLowerCase().trim())}&select=id,prenom,nom,password_hash,is_admin,is_super_admin,actif`);
+      if(!empRows?.length){ err("Identifiant introuvable."); setLoading(false); return; }
+      const emp = empRows[0];
+      if(!emp.is_admin && !emp.is_super_admin){ err("Seuls les administrateurs peuvent réinitialiser leur mot de passe ici."); setLoading(false); return; }
+      setFpEmp(emp); setFpResto(resto);
+      setFpQ(resto.secret_question || "Question secrète non configurée.");
+      setFpStep(2);
+    } catch(e){ err("Erreur réseau."); }
+    setLoading(false);
   };
 
+  const fpVerifyAnswer = async () => {
+    if(!fpA){ err("Veuillez répondre à la question secrète."); return; }
+    setLoading(true); clr();
+    try {
+      const rows = await sb.get("restaurants",
+        `id=eq.${encodeURIComponent(fpResto.id)}&select=secret_answer`);
+      const correctAnswer = rows?.[0]?.secret_answer || "";
+      if(fpA.toLowerCase().trim() !== correctAnswer.toLowerCase().trim()){
+        err("Réponse incorrecte."); setLoading(false); return;
+      }
+      setFpStep(3);
+    } catch(e){ err("Erreur réseau."); }
+    setLoading(false);
+  };
+
+  const fpReset = async () => {
+    if(!fpNew || fpNew !== fpNew2){ err("Les mots de passe ne correspondent pas."); return; }
+    if(fpNew.length < 4){ err("Mot de passe trop court (minimum 4 caractères)."); return; }
+    setLoading(true); clr();
+    try {
+      await sb.patch("employees", fpEmp.id, {password_hash: fpNew});
+      succ("Mot de passe réinitialisé avec succès !");
+      setTimeout(()=>{ setStep("login"); setFpStep(1); setFpCode(""); setFpLogin(""); setFpA(""); setFpNew(""); setFpNew2(""); clr(); }, 2000);
+    } catch(e){ err("Erreur lors de la réinitialisation."); }
+    setLoading(false);
+  };
+
+  // ── CODE OUBLIÉ ────────────────────────────────────────────────
+  const fcFind = async () => {
+    if(!fcCode){ err("Veuillez saisir votre email ou nom du restaurant."); return; }
+    setLoading(true); clr();
+    try {
+      // On cherche par email du restaurant ou par nom
+      let restos = await sb.get("restaurants", `email=eq.${encodeURIComponent(fcCode)}&select=id,nom,code,secret_question`);
+      if(!restos?.length) restos = await sb.get("restaurants", `nom=ilike.${encodeURIComponent("%"+fcCode+"%")}&select=id,nom,code,secret_question&limit=1`);
+      if(!restos?.length){ err("Aucun restaurant trouvé avec ces informations."); setLoading(false); return; }
+      const resto = restos[0];
+      setFcResto(resto);
+      setFcQ(resto.secret_question || "Question secrète non configurée.");
+      setFcStep(2);
+    } catch(e){ err("Erreur réseau."); }
+    setLoading(false);
+  };
+
+  const fcVerify = async () => {
+    if(!fcA){ err("Veuillez répondre à la question secrète."); return; }
+    setLoading(true); clr();
+    try {
+      const rows = await sb.get("restaurants", `id=eq.${encodeURIComponent(fcResto.id)}&select=secret_answer`);
+      const correctAnswer = rows?.[0]?.secret_answer || "";
+      if(fcA.toLowerCase().trim() !== correctAnswer.toLowerCase().trim()){
+        err("Réponse incorrecte."); setLoading(false); return;
+      }
+      setFcStep(3);
+    } catch(e){ err("Erreur réseau."); }
+    setLoading(false);
+  };
+
+  // ── RENDU ──────────────────────────────────────────────────────
+  const renderMsg = () => msg.text ? (
+    <div className={msg.type==="error"?"nxs-error":"nxs-success"}>
+      {msg.type==="error"?"⚠️ ":"✓ "}{msg.text}
+    </div>
+  ) : null;
+
+  const Field = ({label, children}) => (
+    <div className="nxs-field">
+      <label className="nxs-label">{label}</label>
+      {children}
+    </div>
+  );
+
   return (
-    <div style={{minHeight:"100vh",background:"#111318",display:"flex",flexDirection:"column",fontFamily:"system-ui,sans-serif"}}>
-
-      {/* Header brand */}
-      <div style={{paddingTop:60,paddingBottom:24,textAlign:"center"}}>
-        <div style={{fontSize:34,fontWeight:900,color:"#F97316",letterSpacing:"-1px"}}>NexaServe</div>
-        <div style={{fontSize:12,color:"#555",marginTop:6,letterSpacing:"0.18em",textTransform:"uppercase",fontWeight:500}}>Gestion de restaurant</div>
-      </div>
-
-      {/* Tab bar */}
-      <div style={{display:"flex",margin:"0 24px 28px",background:"rgba(255,255,255,.06)",borderRadius:14,padding:4}}>
-        <div style={{flex:1,padding:"11px 0",borderRadius:11,background:"rgba(255,255,255,.1)",textAlign:"center",fontSize:15,fontWeight:700,color:"#fff"}}>Connexion</div>
-        <div style={{flex:1,padding:"11px 0",textAlign:"center",fontSize:15,fontWeight:500,color:"#555"}}>Inscription</div>
-      </div>
-
-      {/* Card */}
-      <div style={{margin:"0 20px",background:"#1a1d24",borderRadius:20,padding:"28px 22px",flex:1,maxHeight:480}}>
-        <div style={{fontSize:22,fontWeight:800,color:"#fff",marginBottom:6}}>Connexion</div>
-        <div style={{fontSize:14,color:"#666",marginBottom:26,lineHeight:1.5}}>Saisissez votre code restaurant et vos identifiants</div>
-
-        {/* Code restaurant */}
-        <div style={{marginBottom:16}}>
-          <div style={{fontSize:12,color:"#888",marginBottom:8,fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase"}}>Code restaurant</div>
-          <input value={code} onChange={e=>{setCode(e.target.value.toUpperCase());setError("");}}
-            onKeyDown={e=>e.key==="Enter"&&submit()}
-            placeholder="NXS-XXXX"
-            style={{...inpStyle,letterSpacing:"0.1em",fontWeight:600}}/>
+    <>
+      <style>{NXS_CSS}</style>
+      <div className="nxs-auth">
+        {/* Logo */}
+        <div className="nxs-logo">
+          <h1>NexaServe</h1>
+          <p>Gestion de restaurant</p>
         </div>
 
-        {/* Login */}
-        <div style={{marginBottom:16}}>
-          <div style={{fontSize:12,color:"#888",marginBottom:8,fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase"}}>Email ou identifiant</div>
-          <input value={login} onChange={e=>{setLogin(e.target.value);setError("");}}
-            onKeyDown={e=>e.key==="Enter"&&submit()}
-            placeholder="prenom.nom ou email"
-            autoCapitalize="none" autoCorrect="off"
-            style={inpStyle}/>
-        </div>
-
-        {/* Password */}
-        <div style={{marginBottom:20}}>
-          <div style={{fontSize:12,color:"#888",marginBottom:8,fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase"}}>Mot de passe</div>
-          <div style={{position:"relative"}}>
-            <input type={showP?"text":"password"} value={pass}
-              onChange={e=>{setPass(e.target.value);setError("");}}
-              onKeyDown={e=>e.key==="Enter"&&submit()}
-              placeholder="••••••••"
-              style={{...inpStyle,paddingRight:50}}/>
-            <button onClick={()=>setShowP(s=>!s)} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#888",fontSize:18,padding:0,lineHeight:1}}>
-              {showP?"🙈":"👁"}
+        {/* ── CONNEXION ── */}
+        {step==="login" && (
+          <div className="nxs-card">
+            <h2 className="nxs-card-title">Connexion</h2>
+            <p className="nxs-card-sub">Saisissez votre code restaurant et vos identifiants</p>
+            {renderMsg()}
+            <Field label="Code restaurant">
+              <input className="nxs-inp" value={code}
+                onChange={e=>{setCode(e.target.value.toUpperCase());clr();}}
+                onKeyDown={e=>e.key==="Enter"&&submitLogin()}
+                placeholder="NXS-XXXX"
+                style={{letterSpacing:"0.1em",fontWeight:600}}/>
+            </Field>
+            <Field label="Email ou identifiant">
+              <input className="nxs-inp" value={login}
+                onChange={e=>{setLogin(e.target.value);clr();}}
+                onKeyDown={e=>e.key==="Enter"&&submitLogin()}
+                placeholder="prenom.nom ou email"
+                autoCapitalize="none" autoCorrect="off"/>
+            </Field>
+            <Field label="Mot de passe">
+              <div className="nxs-inp-wrap">
+                <input className="nxs-inp nxs-inp-pr" type={showP?"text":"password"} value={pass}
+                  onChange={e=>{setPass(e.target.value);clr();}}
+                  onKeyDown={e=>e.key==="Enter"&&submitLogin()}
+                  placeholder="••••••••"/>
+                <button className="nxs-inp-eye" onClick={()=>setShowP(s=>!s)} type="button">
+                  {showP?"🙈":"👁️"}
+                </button>
+              </div>
+            </Field>
+            <button className="nxs-btn" onClick={submitLogin} disabled={loading}>
+              {loading?"Connexion en cours...":"Se connecter"}
             </button>
-          </div>
-        </div>
-
-        {/* Error */}
-        {error&&(
-          <div style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",borderRadius:12,padding:"11px 14px",marginBottom:16,color:"#ef4444",fontSize:13,fontWeight:500}}>
-            ⚠️ {error}
+            <div className="nxs-links">
+              <button className="nxs-link" onClick={()=>{setStep("forgot_pass");setFpStep(1);clr();}}>Mot de passe oublié ?</button>
+              <span className="nxs-sep">·</span>
+              <button className="nxs-link" onClick={()=>{setStep("forgot_code");setFcStep(1);clr();}}>Code oublié ?</button>
+            </div>
           </div>
         )}
 
-        {/* Submit */}
-        <button onClick={submit} disabled={loading} style={{width:"100%",background:"#F97316",border:"none",borderRadius:14,padding:"16px",color:"#000",fontWeight:800,fontSize:16,cursor:loading?"not-allowed":"pointer",opacity:loading?.7:1,marginBottom:16}}>
-          {loading?"Connexion en cours...":"Se connecter"}
-        </button>
+        {/* ── MOT DE PASSE OUBLIÉ ── */}
+        {step==="forgot_pass" && (
+          <div className="nxs-card">
+            <button className="nxs-back" onClick={()=>{setStep("login");clr();}}>← Retour</button>
+            <h2 className="nxs-card-title">Mot de passe oublié</h2>
+            {renderMsg()}
 
-        {/* Links */}
-        <div style={{textAlign:"center",fontSize:13,color:"#F97316",display:"flex",justifyContent:"center",gap:12}}>
-          <span style={{cursor:"pointer"}}>Mot de passe oublié ?</span>
-          <span style={{color:"#444"}}>·</span>
-          <span style={{cursor:"pointer"}}>Code oublié ?</span>
-        </div>
+            {fpStep===1 && <>
+              <p className="nxs-card-sub">Saisissez votre code restaurant et votre identifiant administrateur.</p>
+              <Field label="Code restaurant">
+                <input className="nxs-inp" value={fpCode} onChange={e=>{setFpCode(e.target.value.toUpperCase());clr();}} placeholder="NXS-XXXX" style={{letterSpacing:"0.1em",fontWeight:600}}/>
+              </Field>
+              <Field label="Identifiant (login)">
+                <input className="nxs-inp" value={fpLogin} onChange={e=>{setFpLogin(e.target.value);clr();}} placeholder="prenom.nom" autoCapitalize="none"/>
+              </Field>
+              <button className="nxs-btn" onClick={fpFind} disabled={loading}>{loading?"Recherche...":"Continuer"}</button>
+            </>}
+
+            {fpStep===2 && <>
+              <div className="nxs-info">📋 Question secrète de <strong>{fpResto?.nom}</strong> :</div>
+              <Field label="Question secrète">
+                <input className="nxs-inp" value={fpQ} readOnly style={{color:"#F5A623",fontWeight:600}}/>
+              </Field>
+              <Field label="Votre réponse">
+                <input className="nxs-inp" value={fpA} onChange={e=>{setFpA(e.target.value);clr();}} placeholder="Votre réponse..." autoCapitalize="none"/>
+              </Field>
+              <button className="nxs-btn" onClick={fpVerifyAnswer} disabled={loading}>{loading?"Vérification...":"Vérifier"}</button>
+            </>}
+
+            {fpStep===3 && <>
+              <p className="nxs-card-sub">Choisissez un nouveau mot de passe pour <strong style={{color:"#F5A623"}}>{fpEmp?.prenom} {fpEmp?.nom}</strong>.</p>
+              <Field label="Nouveau mot de passe">
+                <input className="nxs-inp" type="password" value={fpNew} onChange={e=>{setFpNew(e.target.value);clr();}} placeholder="••••••••"/>
+              </Field>
+              <Field label="Confirmer le mot de passe">
+                <input className="nxs-inp" type="password" value={fpNew2} onChange={e=>{setFpNew2(e.target.value);clr();}} placeholder="••••••••"/>
+              </Field>
+              <button className="nxs-btn" onClick={fpReset} disabled={loading}>{loading?"Réinitialisation...":"Enregistrer"}</button>
+            </>}
+          </div>
+        )}
+
+        {/* ── CODE OUBLIÉ ── */}
+        {step==="forgot_code" && (
+          <div className="nxs-card">
+            <button className="nxs-back" onClick={()=>{setStep("login");clr();}}>← Retour</button>
+            <h2 className="nxs-card-title">Code oublié ?</h2>
+            {renderMsg()}
+
+            {fcStep===1 && <>
+              <p className="nxs-card-sub">Saisissez l'email ou le nom de votre restaurant pour retrouver votre code.</p>
+              <Field label="Email ou nom du restaurant">
+                <input className="nxs-inp" value={fcCode} onChange={e=>{setFcCode(e.target.value);clr();}} placeholder="email@restaurant.com ou Mon Restaurant" autoCapitalize="none"/>
+              </Field>
+              <button className="nxs-btn" onClick={fcFind} disabled={loading}>{loading?"Recherche...":"Continuer"}</button>
+            </>}
+
+            {fcStep===2 && <>
+              <div className="nxs-info">📋 Restaurant trouvé : <strong>{fcResto?.nom}</strong>. Répondez à la question secrète pour confirmer votre identité.</div>
+              <Field label="Question secrète">
+                <input className="nxs-inp" value={fcQ} readOnly style={{color:"#F5A623",fontWeight:600}}/>
+              </Field>
+              <Field label="Votre réponse">
+                <input className="nxs-inp" value={fcA} onChange={e=>{setFcA(e.target.value);clr();}} placeholder="Votre réponse..." autoCapitalize="none"/>
+              </Field>
+              <button className="nxs-btn" onClick={fcVerify} disabled={loading}>{loading?"Vérification...":"Vérifier"}</button>
+            </>}
+
+            {fcStep===3 && <>
+              <div style={{textAlign:"center",padding:"16px 0 20px"}}>
+                <div style={{fontSize:12,color:"#5A6170",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.05em"}}>Votre code restaurant</div>
+                <div style={{fontSize:32,fontWeight:900,color:"#F5A623",letterSpacing:"0.15em",fontFamily:"'Outfit',sans-serif"}}>{fcResto?.code}</div>
+                <div style={{fontSize:13,color:"#9CA3B0",marginTop:8}}>{fcResto?.nom}</div>
+              </div>
+              <button className="nxs-btn" onClick={()=>{setStep("login");setCode(fcResto?.code||"");setFcStep(1);setFcCode("");setFcA("");clr();}}>
+                Se connecter avec ce code
+              </button>
+            </>}
+          </div>
+        )}
+
+        <div className="nxs-footer">© 2026 NexaServe · Gestion de restaurant</div>
       </div>
-
-      <div style={{textAlign:"center",padding:"20px 0",fontSize:11,color:"#333"}}>© 2026 NexaServe</div>
-    </div>
+    </>
   );
 }
 
