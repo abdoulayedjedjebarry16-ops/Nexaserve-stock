@@ -28,6 +28,26 @@ input[type=month]::-webkit-calendar-picker-indicator{filter:invert(.5)}
 <script type="text/babel">
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
+// ── OFFLINE BANNER ─────────────────────────────────────────────────
+function OfflineBanner() {
+  const [offline, setOffline] = useState(!navigator.onLine);
+  useEffect(() => {
+    const on  = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener('online',  on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+  if (!offline) return null;
+  return (
+    <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'#dc2626',color:'#fff',
+      textAlign:'center',padding:'8px 16px',fontSize:13,fontWeight:700,letterSpacing:'0.02em',
+      display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+      <span style={{fontSize:16}}>📵</span> Hors ligne — Vérifiez votre connexion internet
+    </div>
+  );
+}
+
 // ── SUPABASE CONFIG ────────────────────────────────────────────────
 const SB_URL  = "https://apqsldtzosodkunftixw.supabase.co";
 const SB_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwcXNsZHR6b3NvZGt1bmZ0aXh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NjQzMzgsImV4cCI6MjA5MzE0MDMzOH0.NU5q6jRt7LY3FcgwANwXc_ADtp8bPjhpNAkiATcX93o";
@@ -1437,6 +1457,208 @@ function RhDepenses({depenses,setDepenses,mouvements,articles,restaurantId}) {
   </div>);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+// HELPERS PDF COMMUNS
+// ═══════════════════════════════════════════════════════════════════
+const pdfOpen = html => { const w=window.open("","_blank"); w.document.write(html); w.document.close(); setTimeout(()=>w.print(),500); };
+const pdfStyle = `body{background:#0d0d1a;color:#fff;font-family:system-ui;padding:20px;font-size:12px}
+h1{color:#F97316;margin-bottom:4px;font-size:20px}.sub{color:#666;margin-bottom:18px;font-size:11px}
+.card{background:#13132a;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px;margin-bottom:12px}
+.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.label{color:#888}.val{font-weight:700}.green{color:#22c55e}.red{color:#ef4444}.orange{color:#F97316}.blue{color:#60a5fa}.purple{color:#a78bfa}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th{background:#1a1a35;color:#F97316;padding:7px 10px;text-align:left;font-size:11px;text-transform:uppercase}
+td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.06);color:#ccc}
+.total-box{background:#0f1f0f;border:1px solid #22c55e33;border-radius:10px;padding:14px;margin-top:12px;display:flex;justify-content:space-between;align-items:center}
+.loss-box{background:#1f0f0f;border:1px solid #ef444433;border-radius:10px;padding:14px;margin-top:12px;display:flex;justify-content:space-between;align-items:center}
+.footer{margin-top:20px;color:#555;font-size:10px;text-align:right}
+@media print{body{background:#fff;color:#000}.card{background:#f8f8f8;border-color:#ddd}.label{color:#555}th{background:#f0f0f0;color:#ea580c}td{border-color:#eee}.total-box{background:#f0fff4;border-color:#22c55e}.loss-box{background:#fff0f0;border-color:#ef4444}}`;
+
+const genPDFRapport = ({titre, sous_titre, sections, bilan}) => {
+  const secHtml = sections.map(s=>`
+    <div class="card">
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#fff">${s.titre}</div>
+      ${s.rows.map(r=>`<div class="row"><span class="label">${r.l}</span><span class="val ${r.cls||''}">${r.v}</span></div>`).join('')}
+    </div>`).join('');
+  const bilanHtml = bilan ? `
+    <div class="${bilan.val>=0?'total-box':'loss-box'}">
+      <span style="font-size:14px;font-weight:700;color:#fff">${bilan.label}</span>
+      <span style="font-size:22px;font-weight:800;color:${bilan.val>=0?'#22c55e':'#ef4444'}">${fmt(bilan.val)}</span>
+    </div>` : '';
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titre}</title>
+    <style>${pdfStyle}</style></head><body>
+    <h1>${titre}</h1><div class="sub">${sous_titre} · Exporté le ${fmtDate(new Date().toISOString())} · NexaServe</div>
+    ${secHtml}${bilanHtml}
+    <div class="footer">NexaServe © ${new Date().getFullYear()} · Document confidentiel</div>
+    </body></html>`;
+  pdfOpen(html);
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// RAPPORTS & BÉNÉFICES
+// ═══════════════════════════════════════════════════════════════════
+function Rapports({mouvements,articles,employes,depenses,payments,paiements,session}) {
+  const [mode,setMode]=useState("jour"); // jour | mois
+  const [date,setDate]=useState(TODAY_STR);
+  const [mois,setMois]=useState(MOIS_COURANT);
+
+  const periode = mode==="jour" ? date : mois;
+
+  // ── Filtres ──────────────────────────────────────────────────────
+  const mvtPeriode  = mouvements.filter(m=> mode==="jour" ? m.created_at.startsWith(date) : m.created_at.startsWith(mois));
+  const payPeriode  = payments.filter(p=>  mode==="jour" ? (p.date_journee===date||p.created_at?.startsWith(date)) : (p.date_journee?.startsWith(mois)||p.created_at?.startsWith(mois)));
+  const depPeriode  = depenses.filter(d=>  mode==="jour" ? d.date===date : d.date.startsWith(mois));
+  const paiePeriode = paiements.filter(p=> mode==="mois" ? p.mois===mois : false);
+
+  // ── Ventes ───────────────────────────────────────────────────────
+  const totalVentes    = payPeriode.reduce((s,p)=>s+(+p.montant),0);
+  const totalEspeces   = payPeriode.reduce((s,p)=>s+(+p.especes),0);
+  const totalCarte     = payPeriode.reduce((s,p)=>s+(+p.carte),0);
+  const totalMobile    = payPeriode.reduce((s,p)=>s+(+p.mobile),0);
+  const nbTransactions = payPeriode.length;
+
+  // ── Stock (coût entrées) ─────────────────────────────────────────
+  const coutStock = mvtPeriode.filter(m=>m.type==="entree").reduce((s,m)=>s+(+m.quantite)*(+m.prix_unitaire_mouvement),0);
+  const valSortie = mvtPeriode.filter(m=>m.type==="sortie").reduce((s,m)=>s+(+m.quantite)*(+m.prix_unitaire_mouvement),0);
+
+  // ── Dépenses fixes ───────────────────────────────────────────────
+  const totalDep = depPeriode.reduce((s,d)=>s+(+d.montant),0);
+
+  // ── Masse salariale (mensuel seulement) ─────────────────────────
+  const masseSalariale = paiePeriode.reduce((s,p)=>s+(+p.salaire_net),0);
+
+  // ── Bénéfice ────────────────────────────────────────────────────
+  const totalCharges = coutStock + totalDep + (mode==="mois"?masseSalariale:0);
+  const benefice     = totalVentes - totalCharges;
+
+  // ── Répartition dépenses par catégorie ──────────────────────────
+  const depParCat = CATS_DEP.map(c=>({...c,total:depPeriode.filter(d=>d.categorie===c.id).reduce((s,d)=>s+(+d.montant),0)})).filter(c=>c.total>0);
+
+  // ── PDF ─────────────────────────────────────────────────────────
+  const exportPDF = () => {
+    const label = mode==="jour" ? `Journée du ${fmtShort(date)}` : `Mois de ${fmtMois(mois)}`;
+    const sections = [
+      { titre:"💰 Ventes ("+session.restaurant+")", rows:[
+        {l:"Chiffre d'affaires total",v:fmt(totalVentes),cls:"green"},
+        {l:"Nombre de transactions",  v:String(nbTransactions)},
+        {l:"Espèces",                 v:fmt(totalEspeces)},
+        {l:"Carte bancaire",          v:fmt(totalCarte)},
+        {l:"Mobile money",            v:fmt(totalMobile)},
+      ]},
+      { titre:"📦 Stock", rows:[
+        {l:"Coût achats / entrées",   v:fmt(coutStock),  cls:"red"},
+        {l:"Valeur sorties consommées",v:fmt(valSortie), cls:"orange"},
+        {l:"Nombre de mouvements",    v:String(mvtPeriode.length)},
+      ]},
+      { titre:"💸 Dépenses fixes"+(depParCat.length?" ("+depPeriode.length+" entrées)":""), rows:
+        depParCat.length>0
+          ? depParCat.map(c=>({l:c.icon+" "+c.id, v:fmt(c.total), cls:"red"})).concat([{l:"TOTAL dépenses fixes",v:fmt(totalDep),cls:"red"}])
+          : [{l:"Aucune dépense enregistrée",v:"0 GNF"}]
+      },
+      ...(mode==="mois"?[{ titre:"👤 Masse salariale", rows:[
+        {l:"Salaires payés ce mois",  v:fmt(masseSalariale), cls:"red"},
+        {l:"Nombre d'employés payés", v:String(paiePeriode.length)},
+      ]}]:[]),
+      { titre:"📊 Récapitulatif charges", rows:[
+        {l:"Coût stock",              v:fmt(coutStock),      cls:"orange"},
+        {l:"Dépenses fixes",          v:fmt(totalDep),       cls:"orange"},
+        ...(mode==="mois"?[{l:"Masse salariale",v:fmt(masseSalariale),cls:"orange"}]:[]),
+        {l:"TOTAL CHARGES",           v:fmt(totalCharges),   cls:"red"},
+      ]},
+    ];
+    genPDFRapport({
+      titre:`📈 Rapport ${mode==="jour"?"Journalier":"Mensuel"} — ${session.restaurant}`,
+      sous_titre: label,
+      sections,
+      bilan:{label:`Bénéfice ${mode==="jour"?"du jour":"du mois"}`,val:benefice}
+    });
+  };
+
+  // ── UI ──────────────────────────────────────────────────────────
+  const KPI = ({label,value,color,bg,sub}) => (
+    <div style={{background:bg||"rgba(255,255,255,.04)",border:`1px solid ${color}33`,borderRadius:14,padding:"14px 12px"}}>
+      <div style={{fontSize:9,color:"#666",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>{label}</div>
+      <div style={{fontSize:typeof value==="string"&&value.length>10?12:20,fontWeight:800,color,lineHeight:1.2}}>{value}</div>
+      {sub&&<div style={{fontSize:10,color:"#555",marginTop:4}}>{sub}</div>}
+    </div>
+  );
+
+  return(<div>
+    {/* Mode toggle */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+      {[{id:"jour",l:"📅 Journalier"},{id:"mois",l:"📆 Mensuel"}].map(m=>(
+        <button key={m.id} onClick={()=>setMode(m.id)} style={{padding:"10px",borderRadius:12,border:mode===m.id?"none":"1px solid rgba(255,255,255,.1)",background:mode===m.id?"linear-gradient(135deg,#6366f1,#4f46e5)":"rgba(255,255,255,.04)",color:mode===m.id?"#fff":"#666",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+          {m.l}
+        </button>
+      ))}
+    </div>
+
+    {/* Sélecteur date/mois */}
+    {mode==="jour"
+      ? <Field label="Date"><Inp type="date" value={date} onChange={e=>setDate(e.target.value)}/></Field>
+      : <Field label="Mois"><Inp type="month" value={mois} onChange={e=>setMois(e.target.value)}/></Field>
+    }
+
+    {/* KPIs Ventes */}
+    <div style={{fontSize:12,fontWeight:700,color:"#aaa",marginBottom:8,marginTop:4}}>💰 Ventes</div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+      <KPI label="Chiffre d'affaires" value={fmt(totalVentes)} color="#22c55e" bg="rgba(34,197,94,.08)" sub={`${nbTransactions} transaction(s)`}/>
+      <KPI label="Espèces"  value={fmt(totalEspeces)}  color="#60a5fa" bg="rgba(96,165,250,.08)"/>
+      <KPI label="Carte"    value={fmt(totalCarte)}    color="#a78bfa" bg="rgba(167,139,250,.08)"/>
+      <KPI label="Mobile"   value={fmt(totalMobile)}   color="#34d399" bg="rgba(52,211,153,.08)"/>
+    </div>
+
+    {/* KPIs Charges */}
+    <div style={{fontSize:12,fontWeight:700,color:"#aaa",marginBottom:8}}>📦 Charges</div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+      <KPI label="Coût stock (achats)" value={fmt(coutStock)}  color="#f97316" bg="rgba(249,115,22,.08)"/>
+      <KPI label="Dépenses fixes"      value={fmt(totalDep)}   color="#ef4444" bg="rgba(239,68,68,.08)"/>
+      {mode==="mois"&&<KPI label="Masse salariale" value={fmt(masseSalariale)} color="#f472b6" bg="rgba(244,114,182,.08)"/>}
+      <KPI label="Total charges" value={fmt(totalCharges)} color="#ef4444" bg="rgba(239,68,68,.12)"/>
+    </div>
+
+    {/* Dépenses par catégorie */}
+    {depParCat.length>0&&<>
+      <div style={{fontSize:12,fontWeight:700,color:"#aaa",marginBottom:8}}>💸 Dépenses par catégorie</div>
+      <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:16}}>
+        {depParCat.map(c=>{
+          const pct=totalDep>0?Math.round((c.total/totalDep)*100):0;
+          return(<div key={c.id} style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:13,width:18}}>{c.icon}</span>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                <span style={{fontSize:11,color:"#ccc"}}>{c.id}</span>
+                <span style={{fontSize:11,fontWeight:700,color:c.color}}>{fmt(c.total)}</span>
+              </div>
+              <div style={{height:3,background:"rgba(255,255,255,.07)",borderRadius:2}}>
+                <div style={{width:`${pct}%`,height:"100%",background:c.color,borderRadius:2}}/>
+              </div>
+            </div>
+            <span style={{fontSize:10,color:"#555",width:26,textAlign:"right"}}>{pct}%</span>
+          </div>);
+        })}
+      </div>
+    </>}
+
+    {/* Bénéfice */}
+    <div style={{background:benefice>=0?"rgba(34,197,94,.08)":"rgba(239,68,68,.08)",border:`1px solid ${benefice>=0?"#22c55e":"#ef4444"}44`,borderRadius:16,padding:20,marginBottom:20,textAlign:"center"}}>
+      <div style={{fontSize:11,color:"#666",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>
+        {benefice>=0?"✅":"❌"} Bénéfice {mode==="jour"?"du jour":"du mois"}
+      </div>
+      <div style={{fontSize:32,fontWeight:900,color:benefice>=0?"#22c55e":"#ef4444",lineHeight:1}}>{fmt(benefice)}</div>
+      <div style={{fontSize:11,color:"#555",marginTop:8}}>
+        {fmt(totalVentes)} ventes − {fmt(totalCharges)} charges
+      </div>
+    </div>
+
+    {/* Bouton PDF */}
+    <Btn onClick={exportPDF} bg="linear-gradient(135deg,#6366f1,#4f46e5)">
+      📄 Exporter / Imprimer le rapport {mode==="jour"?"journalier":"mensuel"}
+    </Btn>
+  </div>);
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // APP PRINCIPALE
 // ═══════════════════════════════════════════════════════════════════
@@ -1455,6 +1677,7 @@ function MainApp({session,onLogout}) {
   const [avances,     setAvances     ]=useState([]);
   const [paiements,   setPaiements   ]=useState([]);
   const [depenses,    setDepenses    ]=useState([]);
+  const [payments,    setPayments    ]=useState([]);
   const [loadState,   setLoadState   ]=useState({loading:true,error:null});
 
   const isPremium = ["premium","essai"].includes(session.plan);
@@ -1472,7 +1695,8 @@ function MainApp({session,onLogout}) {
       isPremium ? sb.get("employee_avances",  `restaurant_id=eq.${rid_enc}&order=date.desc`) : Promise.resolve([]),
       isPremium ? sb.get("employee_paies",    `restaurant_id=eq.${rid_enc}&order=mois.desc`) : Promise.resolve([]),
       isPremium ? sb.get("depenses",          `restaurant_id=eq.${rid_enc}&order=date.desc`) : Promise.resolve([]),
-    ]).then(([a,m,f,e,p,av,pa,dep])=>{
+      sb.get("payments",              `restaurant_id=eq.${rid_enc}&order=created_at.desc&limit=500`),
+    ]).then(([a,m,f,e,p,av,pa,dep,pay])=>{
       setArticles(a||[]);
       setMouvements(m||[]);
       setFournisseurs(f||[]);
@@ -1481,6 +1705,7 @@ function MainApp({session,onLogout}) {
       setAvances(av||[]);
       setPaiements(pa||[]);
       setDepenses(dep||[]);
+      setPayments(pay||[]);
       setLoadState({loading:false,error:null});
     }).catch(err=>{
       setLoadState({loading:false,error:err.message});
@@ -1490,10 +1715,10 @@ function MainApp({session,onLogout}) {
   const alertCount  = articles.filter(a=>getStatus(a)!=="ok").length;
   const paieAttente = employes.filter(e=>e.actif&&!paiements.find(p=>p.employee_id===e.id&&p.mois===MOIS_COURANT&&p.statut==="paye")).length;
 
-  const STOCK_TABS=[{id:"dashboard",l:"Tableau",i:"📊"},{id:"articles",l:"Articles",i:"📦"},{id:"movements",l:"Mvmts",i:"🔄"},{id:"history",l:"Hist.",i:"🕐"},{id:"suppliers",l:"Fourns",i:"🏭"}];
+  const STOCK_TABS=[{id:"dashboard",l:"Tableau",i:"📊"},{id:"articles",l:"Articles",i:"📦"},{id:"movements",l:"Mvmts",i:"🔄"},{id:"history",l:"Hist.",i:"🕐"},{id:"suppliers",l:"Fourns",i:"🏭"},{id:"rapports",l:"Rapports",i:"📈"}];
   const RH_TABS   =[{id:"employes",l:"Employés",i:"👥"},{id:"presences",l:"Présences",i:"📅"},{id:"paie",l:"Paie",i:"💰"},{id:"depenses",l:"Dépenses",i:"💸"},{id:"historique",l:"Historique",i:"📋"}];
   const TITLES={
-    stock:{dashboard:"Tableau de bord",articles:"Articles",movements:"Nouveau mouvement",history:"Historique stock",suppliers:"Fournisseurs"},
+    stock:{dashboard:"Tableau de bord",articles:"Articles",movements:"Nouveau mouvement",history:"Historique stock",suppliers:"Fournisseurs",rapports:"Rapports & Bénéfices"},
     rh:{employes:"Employés",presences:"Présences",paie:"Fiche de paie",depenses:"Dépenses",historique:"Historique paie"},
   };
 
@@ -1509,6 +1734,7 @@ function MainApp({session,onLogout}) {
 
   return(
     <div style={{minHeight:"100vh",background:"#0d0d1a",color:"#fff",fontFamily:"system-ui,sans-serif",maxWidth:500,margin:"0 auto",display:"flex",flexDirection:"column"}}>
+      <OfflineBanner/>
       {/* Header */}
       <div style={{background:"rgba(13,13,26,.97)",borderBottom:"1px solid rgba(255,255,255,.06)",padding:"12px 16px 0",position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",gap:6,marginBottom:10,alignItems:"center"}}>
@@ -1546,6 +1772,7 @@ function MainApp({session,onLogout}) {
             {stockTab==="movements" &&<StockMouvements  articles={articles} setArticles={setArticles} fournisseurs={fournisseurs} employes={employes} setMouvements={setMouvements} restaurantId={rid}/>}
             {stockTab==="history"   &&<StockHistorique  mouvements={mouvements} articles={articles} employes={employes} fournisseurs={fournisseurs}/>}
             {stockTab==="suppliers" &&<StockFournisseurs fournisseurs={fournisseurs} setFournisseurs={setFournisseurs} restaurantId={rid}/>}
+            {stockTab==="rapports"  &&<Rapports mouvements={mouvements} articles={articles} employes={employes} depenses={depenses} payments={payments} paiements={paiements} session={session}/>}
           </>}
           {module==="rh"&&isPremium&&<>
             {rhTab==="employes"   &&<RhEmployes     employes={employes} setEmployes={setEmployes} restaurantId={rid}/>}
