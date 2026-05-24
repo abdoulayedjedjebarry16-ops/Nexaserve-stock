@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Hors ligne — NexaServe Stock</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080A0F;
+      --s1: #0F1118;
+      --s2: #171A24;
+      --gold: #F5A623;
+      --gold2: #D4891A;
+      --t1: #F0F2F8;
+      --t2: #9CA3B0;
+      --t3: #5A6170;
+      --border: rgba(255,255,255,0.07);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--t1);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 24px;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* Cercle animé fond */
+    .glow {
+      position: fixed;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245,166,35,0.08) 0%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -60%);
+      animation: pulse 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: translate(-50%, -60%) scale(1); opacity: 0.6; }
+      50%       { transform: translate(-50%, -60%) scale(1.15); opacity: 1; }
+    }
+
+    .icon-wrap {
+      width: 100px;
+      height: 100px;
+      background: var(--s1);
+      border: 1px solid rgba(245,166,35,0.2);
+      border-radius: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 0 40px rgba(245,166,35,0.12);
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-8px); }
+    }
+
+    .icon-wrap svg {
+      width: 52px;
+      height: 52px;
+    }
+
+    /* Barres wifi coupées */
+    .wifi-icon {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wifi-icon::after {
+      content: '';
+      position: absolute;
+      width: 2px;
+      height: 60px;
+      background: var(--gold);
+      transform: rotate(45deg);
+      opacity: 0.9;
+      border-radius: 2px;
+      box-shadow: 0 0 8px rgba(245,166,35,0.6);
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--t1);
+      text-align: center;
+      margin-bottom: 10px;
+      position: relative;
+      z-index: 1;
+    }
+
+    p {
+      font-size: 14px;
+      color: var(--t2);
+      text-align: center;
+      line-height: 1.6;
+      max-width: 280px;
+      margin-bottom: 40px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card {
+      background: var(--s1);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      width: 100%;
+      max-width: 320px;
+      margin-bottom: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--t3);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+    }
+
+    .tip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--t2);
+    }
+    .tip:last-child { border-bottom: none; }
+    .tip-icon { font-size: 16px; flex-shrink: 0; }
+
+    .btn-retry {
+      background: var(--gold);
+      color: #000;
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 32px;
+      cursor: pointer;
+      width: 100%;
+      max-width: 320px;
+      transition: all 0.15s;
+      position: relative;
+      z-index: 1;
+      letter-spacing: 0.3px;
+    }
+    .btn-retry:active {
+      background: var(--gold2);
+      transform: scale(0.98);
+    }
+
+    .brand {
+      position: fixed;
+      bottom: calc(24px + env(safe-area-inset-bottom));
+      font-family: 'Outfit', sans-serif;
+      font-size: 11px;
+      color: var(--t3);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+
+  <div class="icon-wrap">
+    <div class="wifi-icon">
+      <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6 18C12.5 11.5 21 8 26 8C31 8 39.5 11.5 46 18" stroke="rgba(245,166,35,0.25)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M12 24C16.5 19.5 21 17 26 17C31 17 35.5 19.5 40 24" stroke="rgba(245,166,35,0.45)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M18 30C20.5 27.5 23 26 26 26C29 26 31.5 27.5 34 30" stroke="#F5A623" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="26" cy="38" r="3" fill="#F5A623"/>
+      </svg>
+    </div>
+  </div>
+
+  <h1>Pas de connexion</h1>
+  <p>Vérifiez votre connexion internet pour accéder à NexaServe Stock.</p>
+
+  <div class="card">
+    <div class="card-title">En attendant</div>
+    <div class="tip"><span class="tip-icon">📶</span>Activez le WiFi ou vos données mobiles</div>
+    <div class="tip"><span class="tip-icon">✈️</span>Désactivez le mode avion si actif</div>
+    <div class="tip"><span class="tip-icon">🔄</span>Redémarrez votre connexion si besoin</div>
+  </div>
+
+  <button class="btn-retry" onclick="window.location.reload()">
+    🔄 Réessayer
+  </button>
+
+  <div class="brand">NexaServe Stock</div>
+</body>
+</html>

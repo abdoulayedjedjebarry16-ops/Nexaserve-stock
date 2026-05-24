@@ -1,0 +1,127 @@
+{
+  "sim": {
+    "title": "NexaServe Stock",
+    "website": "https://nexaserve-stock.vercel.app",
+    "icon": "icon.png",
+
+    "statusBar": {
+      "style": "light",
+      "backgroundColor": "#080A0F"
+    },
+
+    "orientation": "portrait",
+    "backgroundColor": "#080A0F",
+
+    "pullToRefresh": {
+      "enabled": false
+    },
+
+    "swipeNavigation": {
+      "enabled": false
+    },
+
+    "navBar": {
+      "enabled": false
+    },
+
+    "toolbar": {
+      "enabled": false
+    },
+
+    "allowedUrls": [
+      "https://nexaserve-stock.vercel.app",
+      "https://apqsldtzosodkunftixw.supabase.co",
+      "https://fonts.googleapis.com",
+      "https://fonts.gstatic.com",
+      "https://unpkg.com"
+    ],
+
+    "externalUrls": [
+      "https://wa.me",
+      "https://api.whatsapp.com"
+    ],
+
+    "offline": {
+      "enabled": true,
+      "errorPage": "offline.html"
+    },
+
+    "splashScreen": {
+      "enabled": true,
+      "backgroundColor": "#080A0F",
+      "image": "icon.png",
+      "imageSize": 200,
+      "delay": 1500,
+      "animationDuration": 400
+    },
+
+    "notifications": {
+      "enabled": true,
+      "android": {
+        "icon": "ic_notification",
+        "color": "#F5A623"
+      }
+    },
+
+    "permissions": {
+      "camera": {
+        "enabled": true,
+        "usageDescription": "Utilisé pour scanner les codes-barres des articles en stock"
+      },
+      "photos": {
+        "enabled": false
+      },
+      "location": {
+        "enabled": false
+      },
+      "contacts": {
+        "enabled": false
+      },
+      "microphone": {
+        "enabled": false
+      }
+    },
+
+    "android": {
+      "packageName": "com.nexaserve.stock",
+      "versionCode": 1,
+      "versionName": "1.0.0",
+      "minSdkVersion": 23,
+      "targetSdkVersion": 34,
+      "hardwareAccelerated": true,
+      "allowBackup": false,
+      "windowSoftInputMode": "adjustResize"
+    },
+
+    "ios": {
+      "bundleId": "com.nexaserve.stock",
+      "version": "1.0.0",
+      "buildNumber": "1",
+      "deploymentTarget": "14.0",
+      "requiresFullScreen": true,
+      "statusBarHidden": false
+    },
+
+    "javascript": {
+      "beforeLoad": "window.IS_MEDIAN_APP = true; window.IS_NEXASERVE_MOBILE = true;",
+      "afterLoad": ""
+    },
+
+    "appearance": {
+      "darkMode": "force",
+      "colorScheme": "dark"
+    },
+
+    "cache": {
+      "enabled": true,
+      "clearOnUpdate": true
+    },
+
+    "gestures": {
+      "backButton": {
+        "enabled": true,
+        "action": "back"
+      }
+    }
+  }
+}
