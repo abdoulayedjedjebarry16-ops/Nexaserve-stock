@@ -95,7 +95,7 @@ const STATUTS_P = {
   absent: { label:"Absent", color:"#ef4444",bg:"rgba(239,68,68,.2)", border:"rgba(239,68,68,.3)", icon:"✗" },
   retard: { label:"Retard", color:"#F97316",bg:"rgba(249,115,22,.2)",border:"rgba(249,115,22,.3)",icon:"⏰" },
 };
-const CYCLE = ["present","absent","retard"];
+const CYCLE = ["present","absent","retard",null]; // null = effacer
 const joursInMonth = mois => { const [y,m]=mois.split("-").map(Number); return new Date(y,m,0).getDate(); };
 const calcPaie = (emp, presences, avances, mois) => {
   const total    = joursInMonth(mois);
@@ -933,20 +933,21 @@ function StockFournisseurs({fournisseurs,setFournisseurs,restaurantId}) {
 // ═══════════════════════════════════════════════════════════════════
 function RhEmployes({employes,setEmployes,restaurantId}) {
   const [modal,setModal]=useState(null);
-  const [form,setForm]=useState({prenom:"",nom:"",poste_rh:"",salaire_base:"",actif:true});
+  const [form,setForm]=useState({prenom:"",nom:"",role:"",poste_rh:"",salaire_base:"",actif:true});
   const [del,setDel]=useState(null);
   const [saving,setSaving]=useState(false);
 
-  const openCreate=()=>{setForm({prenom:"",nom:"",poste_rh:"",salaire_base:"",actif:true});setModal("create");};
-  const openEdit=e=>{setForm({prenom:e.prenom||"",nom:e.nom,poste_rh:e.poste_rh||e.role||"",salaire_base:String(e.salaire_base||0),actif:e.actif});setModal(e);};
+  const openCreate=()=>{setForm({prenom:"",nom:"",role:"",poste_rh:"",salaire_base:"",actif:true});setModal("create");};
+  const openEdit=e=>{setForm({prenom:e.prenom||"",nom:e.nom,role:e.role||"",poste_rh:e.poste_rh||"",salaire_base:String(e.salaire_base||0),actif:e.actif});setModal(e);};
 
   const save=async()=>{
     if(!form.nom)return;
     setSaving(true);
     try {
-      const body={prenom:form.prenom,nom:form.nom,poste_rh:form.poste_rh,salaire_base:+form.salaire_base||0,actif:form.actif,restaurant_id:restaurantId,login:form.prenom?form.prenom.toLowerCase()+"."+form.nom.toLowerCase():form.nom.toLowerCase(),password_hash:"1234",role:"serveur"};
+      const roleVal=form.role||"rh_only";
+      const body={prenom:form.prenom,nom:form.nom,poste_rh:form.poste_rh||form.role,salaire_base:+form.salaire_base||0,actif:form.actif,restaurant_id:restaurantId,login:form.prenom?form.prenom.toLowerCase()+"."+form.nom.toLowerCase():form.nom.toLowerCase(),password_hash:"1234",role:roleVal};
       if(modal==="create"){ const res=await sb.post("employees",body); setEmployes(p=>[...p,...res]); }
-      else { await sb.patch("employees",modal.id,{poste_rh:form.poste_rh,salaire_base:+form.salaire_base||0,actif:form.actif,prenom:form.prenom,nom:form.nom}); setEmployes(p=>p.map(e=>e.id===modal.id?{...e,...form,salaire_base:+form.salaire_base}:e)); }
+      else { await sb.patch("employees",modal.id,{poste_rh:form.poste_rh||form.role,role:roleVal,salaire_base:+form.salaire_base||0,actif:form.actif,prenom:form.prenom,nom:form.nom}); setEmployes(p=>p.map(e=>e.id===modal.id?{...e,...form,role:roleVal,salaire_base:+form.salaire_base}:e)); }
       setModal(null);
     } catch(e){alert("Erreur : "+e.message);}
     setSaving(false);
@@ -987,10 +988,8 @@ function RhEmployes({employes,setEmployes,restaurantId}) {
         <Field label="Prénom"><Inp value={form.prenom} onChange={e=>setForm(f=>({...f,prenom:e.target.value}))} placeholder="Prénom"/></Field>
         <Field label="Nom"><Inp value={form.nom} onChange={e=>setForm(f=>({...f,nom:e.target.value}))} placeholder="Nom"/></Field>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-        <Field label="Poste (libre)"><Inp value={form.poste_rh} onChange={e=>setForm(f=>({...f,poste_rh:e.target.value}))} placeholder="Ex: Cuisinier"/></Field>
-        <Field label="Salaire (GNF)"><Inp type="number" value={form.salaire_base} onChange={e=>setForm(f=>({...f,salaire_base:e.target.value}))} placeholder="4000000"/></Field>
-      </div>
+      <Field label="Rôle / Poste (texte libre)"><Inp value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} placeholder="Ex: Maintenancier, Nettoyeur, Cuisinier..."/></Field>
+      <Field label="Salaire de base (GNF)"><Inp type="number" value={form.salaire_base} onChange={e=>setForm(f=>({...f,salaire_base:e.target.value}))} placeholder="4000000"/></Field>
       <Field label="Statut">
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           {[true,false].map(v=>(
@@ -1025,21 +1024,47 @@ function RhPresences({employes,presences,setPresences,restaurantId}) {
 
   const toggle=async(date)=>{
     const ex=getP(date);
-    const nextStatut=ex?CYCLE[(CYCLE.indexOf(ex.statut)+1)%CYCLE.length]:"present";
-    const body={employee_id:selEmp,date,statut:nextStatut,restaurant_id:restaurantId};
+    const curIdx=ex?CYCLE.indexOf(ex.statut):CYCLE.length-1;
+    const nextStatut=CYCLE[(curIdx+1)%CYCLE.length];
     try {
-      if(ex){
+      if(nextStatut===null){
+        // Effacer la présence
+        if(ex){ await sb.delete("employee_presences",ex.id); setPresences(p=>p.filter(x=>x.id!==ex.id)); }
+      } else if(ex){
         await sb.patch("employee_presences",ex.id,{statut:nextStatut});
         setPresences(p=>p.map(x=>x.id===ex.id?{...x,statut:nextStatut}:x));
       } else {
+        const body={employee_id:selEmp,date,statut:nextStatut,restaurant_id:restaurantId};
         const res=await sb.post("employee_presences",body);
         setPresences(p=>[...p,...(res||[{...body,id:uid()}])]);
       }
     } catch(e) {
-      // Fallback local si upsert échoue
-      if(ex) setPresences(p=>p.map(x=>x.id===ex.id?{...x,statut:nextStatut}:x));
-      else setPresences(p=>[...p,{...body,id:uid()}]);
+      // Fallback local
+      if(nextStatut===null){ if(ex) setPresences(p=>p.filter(x=>x.id!==ex.id)); }
+      else if(ex) setPresences(p=>p.map(x=>x.id===ex.id?{...x,statut:nextStatut}:x));
+      else { const body={employee_id:selEmp,date,statut:nextStatut,restaurant_id:restaurantId}; setPresences(p=>[...p,{...body,id:uid()}]); }
     }
+  };
+
+  const toutMarquer=async(statut)=>{
+    const joursPassesOuAujourd=jours.filter(d=>d<=TODAY_STR);
+    const toInsert=[]; const toUpdate=[];
+    joursPassesOuAujourd.forEach(date=>{
+      const ex=getP(date);
+      if(statut===null){ if(ex) toUpdate.push({action:"delete",id:ex.id}); }
+      else if(ex){ if(ex.statut!==statut) toUpdate.push({action:"patch",id:ex.id,statut}); }
+      else toInsert.push({employee_id:selEmp,date,statut,restaurant_id:restaurantId});
+    });
+    try {
+      for(const u of toUpdate){
+        if(u.action==="delete"){ await sb.delete("employee_presences",u.id); setPresences(p=>p.filter(x=>x.id!==u.id)); }
+        else { await sb.patch("employee_presences",u.id,{statut:u.statut}); setPresences(p=>p.map(x=>x.id===u.id?{...x,statut:u.statut}:x)); }
+      }
+      if(toInsert.length>0){
+        const res=await sb.post("employee_presences",toInsert);
+        setPresences(p=>[...p,...(res||toInsert.map(b=>({...b,id:uid()})))]);
+      }
+    } catch(e){ alert("Erreur : "+e.message); }
   };
 
   const trav   =presences.filter(p=>p.employee_id===selEmp&&p.date.startsWith(mois)&&p.statut==="present").length;
@@ -1064,13 +1089,21 @@ function RhPresences({employes,presences,setPresences,restaurantId}) {
         </div>
       ))}
     </div>
-    <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+    <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
       {Object.entries(STATUTS_P).map(([k,v])=>(
         <div key={k} style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#888"}}>
           <span style={{display:"inline-block",width:14,height:14,borderRadius:4,background:v.bg,border:`1px solid ${v.border}`,textAlign:"center",lineHeight:"14px",fontSize:8,color:v.color}}>{v.icon}</span>{v.label}
         </div>
       ))}
-      <div style={{fontSize:11,color:"#555"}}>· Toucher pour changer</div>
+      <div style={{fontSize:11,color:"#555"}}>· Tap = cycle · Tap×4 = effacer</div>
+    </div>
+    <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+      <div style={{fontSize:11,color:"#666",width:"100%",fontWeight:600,marginBottom:2}}>Tout marquer :</div>
+      {[{k:"present",label:"✓ Tous présents",c:"#22c55e",bg:"rgba(34,197,94,.15)"},{k:"absent",label:"✗ Tous absents",c:"#ef4444",bg:"rgba(239,68,68,.15)"},{k:"retard",label:"⏰ Tous retards",c:"#F97316",bg:"rgba(249,115,22,.15)"},{k:null,label:"🗑 Tout effacer",c:"#555",bg:"rgba(255,255,255,.06)"}].map(opt=>(
+        <button key={String(opt.k)} onClick={()=>toutMarquer(opt.k)} style={{padding:"7px 10px",borderRadius:8,border:`1px solid ${opt.c}33`,background:opt.bg,color:opt.c,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+          {opt.label}
+        </button>
+      ))}
     </div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
       {["L","M","M","J","V","S","D"].map((d,i)=>(<div key={i} style={{textAlign:"center",fontSize:9,color:"#444",fontWeight:600,paddingBottom:3}}>{d}</div>))}
@@ -1258,6 +1291,153 @@ function RhHistoriquePaie({paiements,employes}) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// RH — DÉPENSES
+// ═══════════════════════════════════════════════════════════════════
+const CATS_DEP=[
+  {id:"Loyer",          icon:"🏢", color:"#60a5fa"},
+  {id:"Électricité",    icon:"⚡", color:"#facc15"},
+  {id:"Eau",            icon:"💧", color:"#38bdf8"},
+  {id:"Internet",       icon:"📶", color:"#a78bfa"},
+  {id:"Gaz",            icon:"🔥", color:"#f87171"},
+  {id:"Ingrédients",    icon:"🥬", color:"#4ade80"},
+  {id:"Cuisine",        icon:"🍳", color:"#fb923c"},
+  {id:"Bar / Boissons", icon:"🍋", color:"#fbbf24"},
+  {id:"Chicha",         icon:"💨", color:"#c084fc"},
+  {id:"Emballages",     icon:"🛍", color:"#34d399"},
+  {id:"Transport",      icon:"🚗", color:"#67e8f9"},
+  {id:"Fournitures",    icon:"📦", color:"#e879f9"},
+  {id:"Réparation",     icon:"🔧", color:"#f472b6"},
+  {id:"Nettoyage",      icon:"🧹", color:"#86efac"},
+  {id:"Matériel",       icon:"🛠",  color:"#fca5a5"},
+  {id:"Autre",          icon:"💸", color:"#94a3b8"},
+];
+
+function RhDepenses({depenses,setDepenses,mouvements,articles,restaurantId}) {
+  const [mois,setMois]=useState(MOIS_COURANT);
+  const [modal,setModal]=useState(false);
+  const [form,setForm]=useState({montant:"",categorie:"Loyer",description:"",date:TODAY_STR});
+  const [saving,setSaving]=useState(false);
+  const [del,setDel]=useState(null);
+
+  const depMois=depenses.filter(d=>d.date.startsWith(mois));
+  const totalDepMois=depMois.reduce((s,d)=>s+(+d.montant),0);
+
+  // Calcul coût stock du mois (mouvements entree)
+  const coutStockMois=mouvements
+    .filter(m=>m.type==="entree"&&m.created_at.startsWith(mois))
+    .reduce((s,m)=>s+(+m.quantite)*(+m.prix_unitaire_mouvement),0);
+
+  const totalGeneral=totalDepMois+coutStockMois;
+
+  // Grouper par catégorie
+  const parCat=CATS_DEP.map(c=>({...c,total:depMois.filter(d=>d.categorie===c.id).reduce((s,d)=>s+(+d.montant),0)})).filter(c=>c.total>0);
+
+  const save=async()=>{
+    if(!form.montant||!form.date)return;
+    setSaving(true);
+    try {
+      const body={montant:+form.montant,categorie:form.categorie||"Autre",description:form.description||null,date:form.date,restaurant_id:restaurantId};
+      const res=await sb.post("depenses",body);
+      setDepenses(p=>[...(res||[{...body,id:uid(),created_at:new Date().toISOString()}]),...p]);
+      setForm({montant:"",categorie:"Loyer",description:"",date:TODAY_STR});
+      setModal(false);
+    } catch(e){alert("Erreur : "+e.message);}
+    setSaving(false);
+  };
+
+  const doDel=async(id)=>{
+    try { await sb.delete("depenses",id); setDepenses(p=>p.filter(d=>d.id!==id)); setDel(null); } catch(e){alert("Erreur : "+e.message);}
+  };
+
+  return(<div>
+    {/* Sélecteur mois */}
+    <Field label="Mois"><Inp type="month" value={mois} onChange={e=>setMois(e.target.value)}/></Field>
+
+    {/* Totaux */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:20}}>
+      {[
+        {l:"Dépenses fixes",v:fmt(totalDepMois),c:"#ef4444",bg:"rgba(239,68,68,.1)"},
+        {l:"Coût stock",    v:fmt(coutStockMois),c:"#F97316",bg:"rgba(249,115,22,.1)"},
+        {l:"Total mois",   v:fmt(totalGeneral),  c:"#818cf8",bg:"rgba(99,102,241,.1)"},
+      ].map((k,i)=>(
+        <div key={i} style={{background:k.bg,border:`1px solid ${k.c}33`,borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
+          <div style={{fontSize:9,color:"#666",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6,lineHeight:1.3}}>{k.l}</div>
+          <div style={{fontSize:12,fontWeight:800,color:k.c,lineHeight:1.2}}>{k.v}</div>
+        </div>
+      ))}
+    </div>
+
+    {/* Répartition par catégorie */}
+    {parCat.length>0&&<>
+      <div style={{fontSize:12,fontWeight:700,color:"#aaa",marginBottom:8}}>Répartition</div>
+      <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:18}}>
+        {parCat.map(c=>{
+          const pct=totalDepMois>0?Math.round((c.total/totalDepMois)*100):0;
+          return(<div key={c.id} style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:14,width:20,textAlign:"center"}}>{c.icon}</span>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                <span style={{fontSize:12,color:"#ccc"}}>{c.id}</span>
+                <span style={{fontSize:12,fontWeight:700,color:c.color}}>{fmt(c.total)}</span>
+              </div>
+              <div style={{height:4,background:"rgba(255,255,255,.07)",borderRadius:2}}>
+                <div style={{width:`${pct}%`,height:"100%",background:c.color,borderRadius:2}}/>
+              </div>
+            </div>
+            <span style={{fontSize:10,color:"#555",width:28,textAlign:"right"}}>{pct}%</span>
+          </div>);
+        })}
+      </div>
+    </>}
+
+    {/* Bouton ajouter */}
+    <button onClick={()=>setModal(true)} style={{width:"100%",background:"rgba(99,102,241,.1)",border:"1px dashed rgba(99,102,241,.4)",borderRadius:14,padding:14,cursor:"pointer",color:"#818cf8",fontWeight:700,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:16}}>+ Ajouter une dépense</button>
+
+    {/* Liste */}
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {[...depMois].sort((a,b)=>b.date.localeCompare(a.date)).map(d=>{
+        const cat=CATS_DEP.find(c=>c.id===d.categorie)||CATS_DEP[CATS_DEP.length-1];
+        return(<Card key={d.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px"}}>
+          <div style={{width:36,height:36,borderRadius:10,background:`${cat.color}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{cat.icon}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:600,color:"#fff",fontSize:13}}>{d.categorie}</div>
+            <div style={{fontSize:11,color:"#555",marginTop:1}}>{d.description||"—"} · {fmtShort(d.date)}</div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <span style={{fontWeight:800,fontSize:14,color:cat.color}}>{fmt(d.montant)}</span>
+            <button onClick={()=>setDel(d)} style={{background:"rgba(239,68,68,.1)",border:"none",borderRadius:7,padding:"5px 8px",cursor:"pointer",color:"#ef4444",fontSize:12}}>🗑</button>
+          </div>
+        </Card>);
+      })}
+      {depMois.length===0&&<div style={{textAlign:"center",padding:"30px 0",color:"#444",fontSize:13}}>Aucune dépense ce mois · Cliquez + Ajouter</div>}
+    </div>
+
+    {modal&&<Modal title="Nouvelle dépense" onClose={()=>setModal(false)}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <Field label="Montant (GNF)"><Inp type="number" value={form.montant} onChange={e=>setForm(f=>({...f,montant:e.target.value}))} placeholder="0"/></Field>
+        <Field label="Date"><Inp type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></Field>
+      </div>
+      <Field label="Catégorie">
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:4}}>
+          {CATS_DEP.map(c=>(
+            <button key={c.id} onClick={()=>setForm(f=>({...f,categorie:c.id}))} style={{padding:"8px 6px",borderRadius:8,border:form.categorie===c.id?`1px solid ${c.color}88`:"1px solid rgba(255,255,255,.08)",background:form.categorie===c.id?`${c.color}22`:"rgba(255,255,255,.04)",color:form.categorie===c.id?c.color:"#666",fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:5,justifyContent:"center"}}>
+              {c.icon} {c.id}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label="Description"><Inp value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Ex: Loyer mai 2026"/></Field>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:6}}><Ghost onClick={()=>setModal(false)}>Annuler</Ghost><Btn bg="linear-gradient(135deg,#6366f1,#4f46e5)" onClick={save} disabled={saving||!form.montant}>{saving?"⏳...":"Enregistrer"}</Btn></div>
+    </Modal>}
+
+    {del&&<Modal title="Supprimer la dépense" onClose={()=>setDel(null)}>
+      <p style={{color:"#bbb",fontSize:14,marginBottom:20}}>Supprimer <strong style={{color:"#fff"}}>{del.categorie} — {fmt(del.montant)}</strong> ?</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Ghost onClick={()=>setDel(null)}>Annuler</Ghost><Btn bg="linear-gradient(135deg,#ef4444,#dc2626)" onClick={()=>doDel(del.id)}>Supprimer</Btn></div>
+    </Modal>}
+  </div>);
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // APP PRINCIPALE
 // ═══════════════════════════════════════════════════════════════════
 function MainApp({session,onLogout}) {
@@ -1274,6 +1454,7 @@ function MainApp({session,onLogout}) {
   const [presences,   setPresences   ]=useState([]);
   const [avances,     setAvances     ]=useState([]);
   const [paiements,   setPaiements   ]=useState([]);
+  const [depenses,    setDepenses    ]=useState([]);
   const [loadState,   setLoadState   ]=useState({loading:true,error:null});
 
   const isPremium = ["premium","essai"].includes(session.plan);
@@ -1290,7 +1471,8 @@ function MainApp({session,onLogout}) {
       isPremium ? sb.get("employee_presences",`restaurant_id=eq.${rid_enc}&order=date.asc`) : Promise.resolve([]),
       isPremium ? sb.get("employee_avances",  `restaurant_id=eq.${rid_enc}&order=date.desc`) : Promise.resolve([]),
       isPremium ? sb.get("employee_paies",    `restaurant_id=eq.${rid_enc}&order=mois.desc`) : Promise.resolve([]),
-    ]).then(([a,m,f,e,p,av,pa])=>{
+      isPremium ? sb.get("depenses",          `restaurant_id=eq.${rid_enc}&order=date.desc`) : Promise.resolve([]),
+    ]).then(([a,m,f,e,p,av,pa,dep])=>{
       setArticles(a||[]);
       setMouvements(m||[]);
       setFournisseurs(f||[]);
@@ -1298,6 +1480,7 @@ function MainApp({session,onLogout}) {
       setPresences(p||[]);
       setAvances(av||[]);
       setPaiements(pa||[]);
+      setDepenses(dep||[]);
       setLoadState({loading:false,error:null});
     }).catch(err=>{
       setLoadState({loading:false,error:err.message});
@@ -1308,10 +1491,10 @@ function MainApp({session,onLogout}) {
   const paieAttente = employes.filter(e=>e.actif&&!paiements.find(p=>p.employee_id===e.id&&p.mois===MOIS_COURANT&&p.statut==="paye")).length;
 
   const STOCK_TABS=[{id:"dashboard",l:"Tableau",i:"📊"},{id:"articles",l:"Articles",i:"📦"},{id:"movements",l:"Mvmts",i:"🔄"},{id:"history",l:"Hist.",i:"🕐"},{id:"suppliers",l:"Fourns",i:"🏭"}];
-  const RH_TABS   =[{id:"employes",l:"Employés",i:"👥"},{id:"presences",l:"Présences",i:"📅"},{id:"paie",l:"Paie",i:"💰"},{id:"historique",l:"Historique",i:"📋"}];
+  const RH_TABS   =[{id:"employes",l:"Employés",i:"👥"},{id:"presences",l:"Présences",i:"📅"},{id:"paie",l:"Paie",i:"💰"},{id:"depenses",l:"Dépenses",i:"💸"},{id:"historique",l:"Historique",i:"📋"}];
   const TITLES={
     stock:{dashboard:"Tableau de bord",articles:"Articles",movements:"Nouveau mouvement",history:"Historique stock",suppliers:"Fournisseurs"},
-    rh:{employes:"Employés",presences:"Présences",paie:"Fiche de paie",historique:"Historique paie"},
+    rh:{employes:"Employés",presences:"Présences",paie:"Fiche de paie",depenses:"Dépenses",historique:"Historique paie"},
   };
 
   const tabs      =module==="stock"?STOCK_TABS:RH_TABS;
@@ -1339,6 +1522,7 @@ function MainApp({session,onLogout}) {
               {mod.badge>0&&<span style={{background:module===mod.id?"rgba(255,255,255,.25)":mod.bc,color:"#fff",fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:10}}>{mod.badge}</span>}
             </button>
           ))}
+          <a href="https://wa.me/224620764405?text=Bonjour%20NexaServe%2C%20j%27ai%20besoin%20d%27assistance" target="_blank" rel="noopener noreferrer" title="Support WhatsApp" style={{background:"rgba(37,211,102,.1)",border:"1px solid rgba(37,211,102,.25)",borderRadius:10,padding:"9px 11px",cursor:"pointer",color:"#25d366",fontSize:14,flexShrink:0,textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>💬</a>
           <button onClick={onLogout} title="Déconnexion" style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.2)",borderRadius:10,padding:"9px 11px",cursor:"pointer",color:"#ef4444",fontSize:14,flexShrink:0}}>🚪</button>
         </div>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingBottom:10}}>
@@ -1367,6 +1551,7 @@ function MainApp({session,onLogout}) {
             {rhTab==="employes"   &&<RhEmployes     employes={employes} setEmployes={setEmployes} restaurantId={rid}/>}
             {rhTab==="presences"  &&<RhPresences    employes={employes} presences={presences} setPresences={setPresences} restaurantId={rid}/>}
             {rhTab==="paie"       &&<RhPaie         employes={employes} presences={presences} avances={avances} setAvances={setAvances} paiements={paiements} setPaiements={setPaiements} restaurantId={rid}/>}
+            {rhTab==="depenses"   &&<RhDepenses     depenses={depenses} setDepenses={setDepenses} mouvements={mouvements} articles={articles} restaurantId={rid}/>}
             {rhTab==="historique" &&<RhHistoriquePaie paiements={paiements} employes={employes}/>}
           </>}
         </>}
