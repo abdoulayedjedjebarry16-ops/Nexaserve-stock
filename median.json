@@ -2,7 +2,6 @@
   "sim": {
     "title": "NexaServe Stock",
     "website": "https://nexaserve-stock.vercel.app",
-    "icon": "icon.png",
 
     "statusBar": {
       "style": "light",
@@ -41,24 +40,21 @@
       "https://api.whatsapp.com"
     ],
 
-    "offline": {
-      "enabled": true,
-      "errorPage": "offline.html"
-    },
-
     "splashScreen": {
       "enabled": true,
       "backgroundColor": "#080A0F",
       "image": "icon.png",
-      "imageSize": 200,
+      "imageSize": 220,
       "delay": 1500,
       "animationDuration": 400
     },
 
+    "offlinePage": "offline.html",
+
     "notifications": {
       "enabled": true,
       "android": {
-        "icon": "ic_notification",
+        "icon": "icon.png",
         "color": "#F5A623"
       }
     },
@@ -67,18 +63,6 @@
       "camera": {
         "enabled": true,
         "usageDescription": "Utilisé pour scanner les codes-barres des articles en stock"
-      },
-      "photos": {
-        "enabled": false
-      },
-      "location": {
-        "enabled": false
-      },
-      "contacts": {
-        "enabled": false
-      },
-      "microphone": {
-        "enabled": false
       }
     },
 
@@ -89,39 +73,22 @@
       "minSdkVersion": 23,
       "targetSdkVersion": 34,
       "hardwareAccelerated": true,
-      "allowBackup": false,
-      "windowSoftInputMode": "adjustResize"
+      "allowBackup": false
     },
 
     "ios": {
       "bundleId": "com.nexaserve.stock",
       "version": "1.0.0",
       "buildNumber": "1",
-      "deploymentTarget": "14.0",
-      "requiresFullScreen": true,
-      "statusBarHidden": false
-    },
-
-    "javascript": {
-      "beforeLoad": "window.IS_MEDIAN_APP = true; window.IS_NEXASERVE_MOBILE = true;",
-      "afterLoad": ""
+      "deploymentTarget": "14.0"
     },
 
     "appearance": {
-      "darkMode": "force",
-      "colorScheme": "dark"
+      "darkMode": "force"
     },
 
-    "cache": {
-      "enabled": true,
-      "clearOnUpdate": true
-    },
-
-    "gestures": {
-      "backButton": {
-        "enabled": true,
-        "action": "back"
-      }
+    "javascript": {
+      "beforeLoad": "window.IS_MEDIAN_APP = true; window.IS_NEXASERVE_MOBILE = true;"
     }
   }
 }
