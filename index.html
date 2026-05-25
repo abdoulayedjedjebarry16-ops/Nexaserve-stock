@@ -578,7 +578,7 @@
                   {perms.notif&&<button className="btn btn-ghost" onClick={()=>setNav("notifs")}>📢 Envoyer une notification</button>}
                   {perms.finances&&<button className="btn btn-ghost" onClick={()=>setNav("finances")}>💰 Rapport financier</button>}
                   <button className="btn btn-ghost" onClick={()=>setNav("journal")}>📋 Journal des actions</button>
-                  {stats.expireSoon.length>0&&<button className="btn btn-green" onClick={()=>setShowWAAlerts(true)}>📱 Alertes WhatsApp expiration ({stats.expireSoon.length})</button>}
+                  {stats.expireSoon.length>0&&<button className="btn btn-green" onClick={()=>setShowWAAlerts(true)}>📱 Alertes WhatsApp ({stats.expireSoon.length})</button>}
                 </div>
               </div>
               {/* Bouton PDF Dashboard */}
@@ -605,7 +605,7 @@
       const filtered=restaurants.filter(r=>{
         if(filterStatut!=="all"&&r.statut_abo!==filterStatut)return false;
         if(filterPlan!=="all"&&r.plan!==filterPlan)return false;
-        if(search){const q=search.toLowerCase();if(!r.nom?.toLowerCase().includes(q)&&!r.code?.toLowerCase().includes(q)&&!r.adresse?.toLowerCase().includes(q))return false;}
+        if(search){const q=search.toLowerCase();if(!r.nom?.toLowerCase()?.includes(q)&&!r.code?.toLowerCase()?.includes(q)&&!r.adresse?.toLowerCase()?.includes(q))return false;}
         return true;
       });
       const toggleSuspend=async(r)=>{
@@ -677,7 +677,7 @@
               db("restaurant_notes","GET",null,{restaurant_id:`eq.${r.id}`,order:"created_at.desc",select:"*"}),
               db("admin_logs","GET",null,{restaurant_id:`eq.${r.id}`,order:"created_at.desc",limit:"50",select:"*"}),
             ]);
-            setEmployees(emps);setTables(tbls);setOrders(ords);setPayments(pmts);setNotes(nts);setLogs(lgss);
+            setEmployees(Array.isArray(emps)?emps:[]);setTables(Array.isArray(tbls)?tbls:[]);setOrders(Array.isArray(ords)?ords:[]);setPayments(Array.isArray(pmts)?pmts:[]);setNotes(Array.isArray(nts)?nts:[]);setLogs(Array.isArray(lgss)?lgss:[]);
           }catch(e){} setLoading(false);
         }; load();
       },[r.id]);
@@ -871,8 +871,8 @@
       const [logs,setLogs]=useState([]); const [loading,setLoading]=useState(true);
       const [filterMember,setFilterMember]=useState("all"); const [members,setMembers]=useState([]);
       const [search,setSearch]=useState("");
-      useEffect(()=>{ Promise.all([db("admin_logs","GET",null,{select:"*",order:"created_at.desc",limit:"100"}),db("nexaserve_team","GET",null,{select:"id,prenom,nom"})]).then(([l,m])=>{setLogs(l);setMembers(m);}).catch(()=>toast("Erreur","error")).finally(()=>setLoading(false)); },[]);
-      const filtered=logs.filter(l=>{ if(filterMember!=="all"&&l.team_member_id!==filterMember)return false; if(search){const q=search.toLowerCase();if(!l.action?.toLowerCase().includes(q)&&!l.restaurant_nom?.toLowerCase().includes(q))return false;} return true; });
+      useEffect(()=>{ Promise.all([db("admin_logs","GET",null,{select:"*",order:"created_at.desc",limit:"100"}),db("nexaserve_team","GET",null,{select:"id,prenom,nom"})]).then(([l,m])=>{setLogs(Array.isArray(l)?l:[]);setMembers(Array.isArray(m)?m:[]);}).catch(()=>toast("Erreur","error")).finally(()=>setLoading(false)); },[]);
+      const filtered=logs.filter(l=>{ if(filterMember!=="all"&&l.team_member_id!==filterMember)return false; if(search){const q=search.toLowerCase();if(!l.action?.toLowerCase()?.includes(q)&&!l.restaurant_nom?.toLowerCase()?.includes(q))return false;} return true; });
       return (
         <>
           <div className="page-header">
@@ -907,24 +907,22 @@
     }
 
 
-    // ===== #4 : RENOUVELER ABONNEMENT + REÇU PDF =====
+    // ===== RENOUVELER ABONNEMENT =====
     const exportPDFRecu = (restaurant, montant, duree, user) => {
       const dateExp = new Date();
       const base = restaurant.date_expiration ? new Date(restaurant.date_expiration) : new Date();
       if (base > new Date()) dateExp.setTime(base.getTime());
       dateExp.setDate(dateExp.getDate() + parseInt(duree));
-      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçu abonnement NexaServe</title>
+      const h = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçu NexaServe</title>
       <style>${pdfStyle}</style></head><body>
       <h1>✅ Reçu de paiement — NexaServe</h1>
       <div class="sub">Émis le ${new Date().toLocaleString("fr-FR")} · Par ${user.prenom} ${user.nom}</div>
-      <div class="section">
-        <div class="section-title">Restaurant</div>
+      <div class="section"><div class="section-title">Restaurant</div>
         <div class="row"><span class="label">Nom</span><span class="val">${restaurant.nom}</span></div>
         <div class="row"><span class="label">Code</span><span class="val">${restaurant.code}</span></div>
         <div class="row"><span class="label">Plan</span><span class="val">${(PLANS[restaurant.plan]||PLANS.essai).label}</span></div>
       </div>
-      <div class="section">
-        <div class="section-title">Paiement</div>
+      <div class="section"><div class="section-title">Paiement</div>
         <div class="row"><span class="label">Montant reçu</span><span class="val-green">${fmtGNF(montant)}</span></div>
         <div class="row"><span class="label">Durée</span><span class="val">${duree} jours</span></div>
         <div class="row"><span class="label">Ancienne expiration</span><span class="val">${fmtD(restaurant.date_expiration)}</span></div>
@@ -934,21 +932,16 @@
         <span style="font-size:14px;font-weight:700">Valide jusqu&#39;au</span>
         <span style="font-size:20px;font-weight:800;color:#D4891A">${dateExp.toLocaleDateString("fr-FR")}</span>
       </div>
-      <div class="footer">NexaServe · +224 620 764 405 · Reçu confidentiel · ${new Date().getFullYear()}</div>
+      <div class="footer">NexaServe · +224 620 764 405 · ${new Date().getFullYear()}</div>
       </body></html>`;
-      openPDF(html);
+      openPDF(h);
     };
 
     function RenouvelerSheet({ restaurant, onClose, onReloaded, user, toast }) {
       const [montant, setMontant] = useState("");
       const [duree,   setDuree]   = useState("30");
       const [saving,  setSaving]  = useState(false);
-      const DUREES = [
-        {label:"1 mois (30j)",  val:"30"},
-        {label:"3 mois (90j)",  val:"90"},
-        {label:"6 mois (180j)", val:"180"},
-        {label:"1 an (365j)",   val:"365"},
-      ];
+      const DUREES = [{label:"1 mois (30j)",val:"30"},{label:"3 mois (90j)",val:"90"},{label:"6 mois (180j)",val:"180"},{label:"1 an (365j)",val:"365"}];
       const valider = async () => {
         if (!montant) { toast("Saisissez le montant reçu","error"); return; }
         setSaving(true);
@@ -960,7 +953,7 @@
           await db("restaurants","PATCH",{date_expiration:base.toISOString(),statut_abo:"actif"},{id:`eq.${restaurant.id}`});
           await logAction(user,"Renouvellement abonnement",restaurant.id,restaurant.nom,`+${days}j · ${fmtGNF(parseFloat(montant))}`);
           exportPDFRecu(restaurant, parseFloat(montant), duree, user);
-          toast("Abonnement renouvelé ! Reçu généré.","success");
+          toast("Renouvelé ! Reçu PDF généré.","success");
           onReloaded(); onClose();
         } catch(e) { toast("Erreur : "+e.message,"error"); }
         setSaving(false);
@@ -968,164 +961,113 @@
       return (
         <Sheet open={true} onClose={onClose} title="💳 Renouveler l'abonnement"
           footer={<><button className="btn btn-ghost" onClick={onClose}>Annuler</button><button className="btn btn-gold" onClick={valider} disabled={saving}>{saving?"Enregistrement...":"✅ Valider + Reçu PDF"}</button></>}>
-          <div className="alert alert-info mb12">Le renouvellement prolonge à partir de l'expiration actuelle ou d'aujourd'hui si déjà expirée.</div>
+          <div className="alert alert-info mb12">Prolonge à partir de l'expiration actuelle ou d'aujourd'hui si expirée.</div>
           <FieldInp label="Montant reçu (GNF) *" value={montant} onChange={setMontant} type="number" placeholder="150000" required/>
           <div className="field">
             <label>Durée *</label>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:4}}>
-              {DUREES.map(d=>(
-                <button key={d.val} className={`btn ${duree===d.val?"btn-gold":"btn-ghost"} btn-sm`}
-                  onClick={()=>setDuree(d.val)}>{d.label}</button>
-              ))}
+              {DUREES.map(d=><button key={d.val} className={`btn ${duree===d.val?"btn-gold":"btn-ghost"} btn-sm`} onClick={()=>setDuree(d.val)}>{d.label}</button>)}
             </div>
           </div>
-          <div style={{fontSize:13,color:"var(--t3)",marginTop:8}}>
-            Expiration actuelle : <b>{fmtDate(restaurant.date_expiration)}</b>
-          </div>
+          <div style={{fontSize:13,color:"var(--t3)",marginTop:8}}>Expiration actuelle : <b>{fmtDate(restaurant.date_expiration)}</b></div>
         </Sheet>
       );
     }
 
-    // ===== #5 : CRÉATION RESTAURANT DEPUIS L'ADMIS =====
+    // ===== CRÉER RESTAURANT =====
     function CreateRestaurantSheet({ onClose, onCreated, user, toast }) {
       const SUPA_EDGE = "https://apqsldtzosodkunftixw.supabase.co/functions/v1";
-      const [step, setStep] = useState(1);
-      const [f, setF] = useState({
-        restaurantNom:"", adresse:"", telephone:"", email:"",
-        prenom:"", nom:"", password:"",
-        plan:"essai", dureeJours:"14",
-      });
-      const [loading, setLoading] = useState(false);
-      const [result,  setResult]  = useState(null);
+      const [step,    setStep]   = useState(1);
+      const [loading, setLoading]= useState(false);
+      const [result,  setResult] = useState(null);
+      const [f, setF] = useState({restaurantNom:"",adresse:"",telephone:"",email:"",prenom:"",nom:"",password:"",plan:"essai",dureeJours:"14"});
       const set = k => v => setF(x=>({...x,[k]:v}));
-      const PLANS_DUREE = {essai:"14", basic:"30", pro:"30", premium:"30"};
-
+      const PLANS_DUREE = {essai:"14",basic:"30",pro:"30",premium:"30"};
       const submit = async () => {
-        if (!f.restaurantNom||!f.email||!f.prenom||!f.nom||!f.password) {
-          toast("Champs obligatoires manquants","error"); return;
-        }
-        if (f.password.length < 6) { toast("Mot de passe trop court (min 6)","error"); return; }
+        if (!f.restaurantNom||!f.email||!f.prenom||!f.nom||!f.password){toast("Champs obligatoires","error");return;}
+        if (f.password.length<6){toast("Mot de passe trop court (min 6)","error");return;}
         setLoading(true);
         try {
-          const dateExp = new Date();
-          dateExp.setDate(dateExp.getDate() + parseInt(f.dureeJours||14));
-          const res = await fetch(`${SUPA_EDGE}/restaurants`, {
-            method:"POST",
-            headers:{"Content-Type":"application/json","apikey":ANON_KEY,"Authorization":`Bearer ${ANON_KEY}`},
-            body: JSON.stringify({
-              nom: f.restaurantNom, adresse: f.adresse||null,
-              telephone: f.telephone||null, email: f.email,
-              secret_question: "Quelle est la ville de naissance de votre mère ?",
-              secret_answer: "nexaserve",
-              admin: { prenom:f.prenom, nom:f.nom, email:f.email, password:f.password },
-            })
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error||data.message||"Erreur création");
-          await db("restaurants","PATCH",{
-            plan:f.plan,
-            statut_abo:f.plan==="essai"?"essai":"actif",
-            date_expiration:dateExp.toISOString()
-          },{id:`eq.${data.restaurant.id}`});
+          const dateExp=new Date(); dateExp.setDate(dateExp.getDate()+parseInt(f.dureeJours||14));
+          const res=await fetch(`${SUPA_EDGE}/restaurants`,{method:"POST",headers:{"Content-Type":"application/json","apikey":ANON_KEY,"Authorization":`Bearer ${ANON_KEY}`},
+            body:JSON.stringify({nom:f.restaurantNom,adresse:f.adresse||null,telephone:f.telephone||null,email:f.email,
+              secret_question:"Quelle est la ville de naissance de votre mère ?",secret_answer:"nexaserve",
+              admin:{prenom:f.prenom,nom:f.nom,email:f.email,password:f.password}})});
+          const data=await res.json();
+          if(!res.ok) throw new Error(data.error||data.message||"Erreur création");
+          await db("restaurants","PATCH",{plan:f.plan,statut_abo:f.plan==="essai"?"essai":"actif",date_expiration:dateExp.toISOString()},{id:`eq.${data.restaurant.id}`});
           await logAction(user,"Création restaurant (admis)",data.restaurant.id,f.restaurantNom,`Plan: ${f.plan} · ${f.dureeJours}j`);
-          setResult({code:data.restaurant.code, login:f.email, password:f.password, nom:f.restaurantNom});
-          toast("Restaurant créé avec succès !","success");
-          onCreated();
-        } catch(e) { toast("Erreur : "+e.message,"error"); }
+          setResult({code:data.restaurant.code,login:f.email,password:f.password,nom:f.restaurantNom});
+          toast("Restaurant créé !","success"); onCreated();
+        } catch(e){toast("Erreur : "+e.message,"error");}
         setLoading(false);
       };
-
       if (result) return (
         <Sheet open={true} onClose={onClose} title="🎉 Restaurant créé !">
           <div className="alert alert-info mb12">Communiquez ces identifiants au restaurant.</div>
           <CodeBox label="Code restaurant" value={result.code}/>
-          <CodeBox label="Email / Login"    value={result.login}/>
-          <CodeBox label="Mot de passe"     value={result.password}/>
+          <CodeBox label="Email / Login" value={result.login}/>
+          <CodeBox label="Mot de passe" value={result.password}/>
           <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
-            <a href={`https://wa.me/?text=${encodeURIComponent("Bonjour ! Votre espace NexaServe est prêt.\n\n🏪 Restaurant : "+result.nom+"\n🔑 Code : "+result.code+"\n📧 Email : "+result.login+"\n🔒 Mot de passe : "+result.password+"\n\n👉 Connectez-vous sur https://nexaserveapp.com")}`}
-              target="_blank" rel="noopener noreferrer"
-              style={{textDecoration:"none"}}
-              className="btn btn-green">
+            <a href={`https://wa.me/?text=${encodeURIComponent("Bonjour ! Votre espace NexaServe est prêt.\n\n🏪 "+result.nom+"\n🔑 Code : "+result.code+"\n📧 "+result.login+"\n🔒 "+result.password+"\n\n👉 https://nexaserveapp.com")}`}
+              target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}} className="btn btn-green">
               💬 Envoyer via WhatsApp
             </a>
             <button className="btn btn-ghost" onClick={onClose}>Fermer</button>
           </div>
         </Sheet>
       );
-
       return (
         <Sheet open={true} onClose={onClose} title="➕ Créer un restaurant"
           footer={step===1
-            ? <button className="btn btn-gold" onClick={()=>{if(!f.restaurantNom||!f.email){toast("Champs obligatoires","error");return;}setStep(2);}}>Suivant →</button>
-            : <><button className="btn btn-ghost" onClick={()=>setStep(1)}>← Retour</button><button className="btn btn-gold" onClick={submit} disabled={loading}>{loading?"Création en cours...":"Créer le restaurant"}</button></>
-          }>
-          {step===1 && <>
+            ?<button className="btn btn-gold" onClick={()=>{if(!f.restaurantNom||!f.email){toast("Champs obligatoires","error");return;}setStep(2);}}>Suivant →</button>
+            :<><button className="btn btn-ghost" onClick={()=>setStep(1)}>← Retour</button><button className="btn btn-gold" onClick={submit} disabled={loading}>{loading?"Création...":"Créer le restaurant"}</button></>}>
+          {step===1&&<>
             <FieldInp label="Nom du restaurant *" value={f.restaurantNom} onChange={set("restaurantNom")} placeholder="Ex : Le Palais Guinéen" required/>
-            <FieldInp label="Adresse"              value={f.adresse}      onChange={set("adresse")}      placeholder="Ex : Ratoma, Conakry"/>
-            <FieldInp label="Téléphone"            value={f.telephone}    onChange={set("telephone")}    placeholder="+224 620 000 000"/>
-            <FieldInp label="Email (identifiant admin) *" value={f.email} onChange={set("email")} type="email" placeholder="admin@restaurant.com" required/>
+            <FieldInp label="Adresse"              value={f.adresse}      onChange={set("adresse")}       placeholder="Ratoma, Conakry"/>
+            <FieldInp label="Téléphone"            value={f.telephone}    onChange={set("telephone")}     placeholder="+224 620 000 000"/>
+            <FieldInp label="Email admin *"        value={f.email}        onChange={set("email")}         type="email" placeholder="admin@restaurant.com" required/>
           </>}
-          {step===2 && <>
-            <FieldInp label="Prénom admin *"   value={f.prenom}   onChange={set("prenom")}   placeholder="Mamadou" required/>
-            <FieldInp label="Nom admin *"       value={f.nom}      onChange={set("nom")}      placeholder="Diallo"  required/>
-            <FieldInp label="Mot de passe *"   value={f.password} onChange={set("password")} type="password" placeholder="Min 6 caractères" required/>
-            <div className="field">
-              <label>Plan *</label>
-              <select className="inp" value={f.plan} onChange={e=>setF(x=>({...x,plan:e.target.value,dureeJours:PLANS_DUREE[e.target.value]||"30"}))}>
-                {Object.entries(PLANS).map(([k,p])=><option key={k} value={k}>{p.label}{p.prix>0?" — "+fmtGNF(p.prix)+"/mois":""}</option>)}
-              </select>
-            </div>
-            <FieldInp label="Durée d'accès (jours)" value={f.dureeJours} onChange={set("dureeJours")} type="number" placeholder="30"/>
+          {step===2&&<>
+            <FieldInp label="Prénom admin *" value={f.prenom}   onChange={set("prenom")}   placeholder="Mamadou" required/>
+            <FieldInp label="Nom admin *"    value={f.nom}      onChange={set("nom")}      placeholder="Diallo" required/>
+            <FieldInp label="Mot de passe *" value={f.password} onChange={set("password")} type="password" placeholder="Min 6 caractères" required/>
+            <div className="field"><label>Plan *</label><select className="inp" value={f.plan} onChange={e=>setF(x=>({...x,plan:e.target.value,dureeJours:PLANS_DUREE[e.target.value]||"30"}))}>
+              {Object.entries(PLANS).map(([k,p])=><option key={k} value={k}>{p.label}{p.prix>0?" — "+fmtGNF(p.prix)+"/mois":""}</option>)}
+            </select></div>
+            <FieldInp label="Durée accès (jours)" value={f.dureeJours} onChange={set("dureeJours")} type="number" placeholder="30"/>
           </>}
         </Sheet>
       );
     }
 
-    // ===== #6 : ALERTES WHATSAPP EXPIRATION =====
+    // ===== ALERTES WHATSAPP =====
     function WhatsAppAlertsSheet({ restaurants, onClose }) {
-      const urgents = [...restaurants].sort((a,b)=>(daysLeft(a.date_expiration)||99)-(daysLeft(b.date_expiration)||99));
-      const genMsg = (r) => {
-        const d = daysLeft(r.date_expiration);
-        const plan = (PLANS[r.plan]||PLANS.essai).label;
-        return encodeURIComponent(
-          "Bonjour "+r.nom+" 👋\n\n"+
-          "⚠️ Votre abonnement NexaServe ("+plan+") expire dans "+d+" jour"+(d>1?"s":"")+"."+"\n\n"+
-          "📅 Date d'expiration : "+fmtD(r.date_expiration)+"\n"+
-          "🔑 Code restaurant : "+r.code+"\n\n"+
-          "Pour renouveler et continuer à utiliser NexaServe, contactez-nous !\n\n"+
-          "📞 NexaServe : +224 620 764 405"
-        );
+      const urgents=[...restaurants].sort((a,b)=>(daysLeft(a.date_expiration)||99)-(daysLeft(b.date_expiration)||99));
+      const genMsg=(r)=>{
+        const d=daysLeft(r.date_expiration); const plan=(PLANS[r.plan]||PLANS.essai).label;
+        return encodeURIComponent("Bonjour "+r.nom+" 👋\n\n⚠️ Votre abonnement NexaServe ("+plan+") expire dans "+d+" jour"+(d>1?"s":"")+"."+"\n\n📅 Expiration : "+fmtD(r.date_expiration)+"\n🔑 Code : "+r.code+"\n\nContactez-nous pour renouveler !\n\n📞 +224 620 764 405");
       };
-      const telNum = (r) => {
-        const t = (r.telephone||"").replace(/[^0-9]/g,"");
-        return t.length >= 9 ? t.slice(-9) : "620764405";
-      };
+      const tel=(r)=>{const t=(r.telephone||"").replace(/[^0-9]/g,"");return t.length>=9?t.slice(-9):"620764405";};
       return (
         <Sheet open={true} onClose={onClose} title="📱 Alertes WhatsApp expiration">
           {urgents.length===0
-            ? <div className="empty"><div className="empty-icon">✅</div><div className="empty-text">Aucune expiration dans les 7 prochains jours</div></div>
-            : <>
-                <div className="alert alert-warn mb12">{urgents.length} restaurant(s) expirent dans les 7 prochains jours. Tap sur un restaurant pour ouvrir WhatsApp.</div>
-                {urgents.map(r=>{
-                  const d = daysLeft(r.date_expiration);
-                  return (
-                    <div key={r.id} className="card mb8" style={{padding:"12px 14px",borderColor:d<=3?"rgba(239,68,68,0.4)":"rgba(245,166,35,0.3)"}}>
-                      <div className="flex-between mb8">
-                        <div>
-                          <div style={{fontWeight:700,fontSize:14}}>{r.nom}</div>
-                          <div style={{fontSize:11,color:"var(--t3)"}}>{r.code} · {(PLANS[r.plan]||PLANS.essai).label} · {fmtD(r.date_expiration)}</div>
-                        </div>
-                        <span className={`chip ${d<=3?"chip-red":"chip-gold"}`}>{d<=3?"🚨":"⚠️"} {d}j</span>
-                      </div>
-                      <a href={`https://wa.me/224${telNum(r)}?text=${genMsg(r)}`}
-                        target="_blank" rel="noopener noreferrer"
-                        style={{textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%",background:"rgba(34,197,94,0.15)",color:"var(--green)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:8,padding:"9px 14px",fontWeight:600,fontSize:13}}>
-                        💬 Contacter via WhatsApp
-                      </a>
-                    </div>
-                  );
-                })}
-              </>
+            ?<div className="empty"><div className="empty-icon">✅</div><div className="empty-text">Aucune expiration dans les 7 prochains jours</div></div>
+            :<>
+              <div className="alert alert-warn mb12">{urgents.length} restaurant(s) expirent bientôt.</div>
+              {urgents.map(r=>{const d=daysLeft(r.date_expiration);return(
+                <div key={r.id} className="card mb8" style={{padding:"12px 14px",borderColor:d<=3?"rgba(239,68,68,0.4)":"rgba(245,166,35,0.3)"}}>
+                  <div className="flex-between mb8">
+                    <div><div style={{fontWeight:700,fontSize:14}}>{r.nom}</div><div style={{fontSize:11,color:"var(--t3)"}}>{r.code} · {(PLANS[r.plan]||PLANS.essai).label} · {fmtD(r.date_expiration)}</div></div>
+                    <span className={`chip ${d<=3?"chip-red":"chip-gold"}`}>{d<=3?"🚨":"⚠️"} {d}j</span>
+                  </div>
+                  <a href={`https://wa.me/224${tel(r)}?text=${genMsg(r)}`} target="_blank" rel="noopener noreferrer"
+                    style={{textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%",background:"rgba(34,197,94,0.15)",color:"var(--green)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:8,padding:"9px 14px",fontWeight:600,fontSize:13}}>
+                    💬 Contacter via WhatsApp
+                  </a>
+                </div>
+              );})}
+            </>
           }
           <button className="btn btn-ghost mt8" onClick={onClose}>Fermer</button>
         </Sheet>
