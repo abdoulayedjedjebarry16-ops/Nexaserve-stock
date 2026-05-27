@@ -1734,7 +1734,7 @@ function MainApp({session,onLogout}) {
   if(!isPremium&&module==="rh") return <UpgradeWall session={session} onLogout={onLogout} moduleLabel="RH & Paie"/>;
 
   return(
-    <div style={{minHeight:"100vh",background:"#0d0d1a",color:"#fff",fontFamily:"system-ui,sans-serif",maxWidth:500,margin:"0 auto",display:"flex",flexDirection:"column"}}>
+    <div style={{minHeight:"100vh",background:"#0d0d1a",color:"#fff",fontFamily:"system-ui,sans-serif",maxWidth:1200,margin:"0 auto",display:"flex",flexDirection:"column"}}>
       <OfflineBanner/>
       {/* Modale confirmation déconnexion */}
       {showLogoutConfirm&&(
@@ -1800,7 +1800,7 @@ function MainApp({session,onLogout}) {
       </div>
 
       {/* Bottom nav */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:500,background:"rgba(13,13,26,.98)",borderTop:"1px solid rgba(255,255,255,.07)",display:"flex",padding:"8px 0 14px",zIndex:200}}>
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:1200,background:"rgba(13,13,26,.98)",borderTop:"1px solid rgba(255,255,255,.07)",display:"flex",padding:"8px 0 14px",zIndex:200}}>
         {tabs.map(t=>{
           const active=activeTab===t.id;
           const isMid=t.id===midId;
